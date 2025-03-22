@@ -1,0 +1,2 @@
+# confy
+Laconic configuration tool
