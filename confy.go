@@ -25,7 +25,7 @@ func Get(path string, cfg interface{}) error {
 		return err
 	}
 
-	return readEnvVars(cfg, false)
+	return nil
 }
 
 // ReadEnv reads environment variables into the structure.

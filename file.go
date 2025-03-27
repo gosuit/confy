@@ -70,7 +70,7 @@ func parseYAML(r io.Reader, str interface{}) error {
 		return errors.New("config must be struct")
 	}
 
-	if err := mergeStruct(data, out); err != nil {
+	if err := mergeStruct(data, out, "yaml"); err != nil {
 		return err
 	}
 

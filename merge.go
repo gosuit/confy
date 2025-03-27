@@ -1,12 +1,9 @@
 package confy
 
 import (
-	"encoding"
 	"errors"
-	"fmt"
-	"net/url"
+	"os"
 	"reflect"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -16,71 +13,73 @@ type structKey struct {
 	Required bool
 }
 
-func mergeStruct(data map[string]any, out reflect.Value) error {
+func mergeStruct(data map[string]any, out reflect.Value, fileType string) error {
 	for i := range out.NumField() {
 		field := out.Field(i)
 
-		key := setupKey(out, i, "yaml")
-		if key == nil {
+		env := out.Type().Field(i).Tag.Get(TagEnv)
+		envDefault := out.Type().Field(i).Tag.Get(TagEnvDefault)
+		separator := out.Type().Field(i).Tag.Get(TagEnvSeparator)
+		layout := out.Type().Field(i).Tag.Get(TagEnvLayout)
+
+		key := setupKey(out, i, fileType)
+		if key == "" {
 			continue
 		}
 
-		val, ok := data[key.Value]
+		val, ok := data[key]
 		if !ok {
-			if key.Required {
-				return errors.New(fmt.Sprintf(`field "%s" is required`, key.Value))
-			} else {
-				continue
-			}
-		} else {
-			if field.IsValid() && field.CanSet() {
-				if err := setupValue(field, val); err != nil {
+			eval, ok := os.LookupEnv(env)
+			if ok {
+				if err := parseValue(field, eval, separator, &layout); err != nil {
 					return err
 				}
-			}
-		}
-	}
-
-	return nil
-}
-
-func setupKey(out reflect.Value, index int, fileType string) *structKey {
-	tag := out.Type().Field(index).Tag.Get(fileType)
-
-	var key structKey
-
-	if tag != "-" {
-		if tag == "" {
-			key = structKey{
-				Value:    strings.ToLower(out.Type().Field(index).Name),
-				Required: false,
-			}
-		} else {
-			parts := strings.Split(tag, ",")
-
-			if len(parts) != 1 && parts[1] == "required" {
-				key = structKey{
-					Value:    parts[0],
-					Required: true,
+			} else if envDefault != "" {
+				if err := parseValue(field, envDefault, separator, &layout); err != nil {
+					return err
 				}
 			} else {
-				key = structKey{
-					Value:    tag,
-					Required: false,
+				required := out.Type().Field(i).Tag.Get("required")
+
+				if required == "true" {
+					return errors.New("invalid input")
 				}
 			}
+		} else {
+			if err := setupValue(field, val, env, envDefault, fileType, separator, layout); err != nil {
+				return err
+			}
 		}
-
-		return &key
 	}
 
 	return nil
 }
 
-func setupValue(field reflect.Value, val any) error {
+func setupValue(field reflect.Value, val any, env, envDefault, fileType, separator, layout string) error {
+	var expanded bool
+	if sval, ok := val.(string); ok {
+		env, envDefault, expanded = updateTags(sval, env, envDefault)
+	}
+
+	if env != "" {
+		eval, ok := os.LookupEnv(env)
+		if ok {
+			return parseValue(field, eval, separator, &layout)
+		} else if expanded {
+			return parseValue(field, envDefault, separator, &layout)
+		}
+	}
+
+	if structParser, found := validStructs[field.Type()]; found {
+		if sval, ok := val.(string); ok {
+			return structParser(&field, sval, nil)
+		} else {
+			return errors.New("invalid input data.")
+		}
+	}
+
 	switch field.Kind() {
 	case reflect.Interface:
-		fmt.Println("tut")
 		field.Set(reflect.ValueOf(val))
 	case reflect.Map:
 		if field.Type().Key().Kind() != reflect.String {
@@ -88,11 +87,12 @@ func setupValue(field reflect.Value, val any) error {
 		}
 
 		newMap := reflect.MakeMap(field.Type())
+
 		if mval, ok := val.(map[string]any); ok {
 			for k, v := range mval {
 				newVal := reflect.New(field.Type().Elem()).Elem()
 
-				if err := setupValue(newVal, v); err != nil {
+				if err := setupValue(newVal, v, "", "", fileType, separator, layout); err != nil {
 					return err
 				}
 
@@ -114,7 +114,7 @@ func setupValue(field reflect.Value, val any) error {
 			for i := range aval {
 				newVal := reflect.New(field.Type().Elem()).Elem()
 
-				if err := setupValue(newVal, aval[i]); err != nil {
+				if err := setupValue(newVal, aval[i], "", "", fileType, separator, layout); err != nil {
 					return err
 				}
 
@@ -128,7 +128,7 @@ func setupValue(field reflect.Value, val any) error {
 			for i := range sval {
 				newVal := reflect.New(field.Type().Elem()).Elem()
 
-				if err := setupValue(newVal, sval[i]); err != nil {
+				if err := setupValue(newVal, sval[i], "", "", fileType, separator, layout); err != nil {
 					return err
 				}
 
@@ -139,7 +139,7 @@ func setupValue(field reflect.Value, val any) error {
 		}
 	case reflect.Struct:
 		if mval, ok := val.(map[string]any); ok {
-			if err := mergeStruct(mval, field); err != nil {
+			if err := mergeStruct(mval, field, ""); err != nil {
 				return err
 			}
 		} else {
@@ -148,7 +148,7 @@ func setupValue(field reflect.Value, val any) error {
 	case reflect.Ptr:
 		newField := reflect.New(field.Type().Elem()).Elem()
 
-		if err := setupValue(newField, val); err != nil {
+		if err := setupValue(newField, val, "", "", fileType, separator, layout); err != nil {
 			return err
 		}
 
@@ -165,8 +165,25 @@ func setupValue(field reflect.Value, val any) error {
 		} else {
 			return errors.New("Value for bool must be bool")
 		}
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32:
 		if ival, ok := val.(int); ok {
+			if !field.OverflowInt(int64(ival)) {
+				field.SetInt(int64(ival))
+			} else {
+				return errors.New("Value for int is overflowed")
+			}
+		} else {
+			return errors.New("Value for int must be int")
+		}
+	case reflect.Int64:
+		sval, ok := val.(string)
+		if field.Type() == reflect.TypeOf(time.Duration(0)) && ok {
+			d, err := time.ParseDuration(sval)
+			if err != nil {
+				return err
+			}
+			field.SetInt(int64(d))
+		} else if ival, ok := val.(int); ok {
 			if !field.OverflowInt(int64(ival)) {
 				field.SetInt(int64(ival))
 			} else {
@@ -202,214 +219,37 @@ func setupValue(field reflect.Value, val any) error {
 	return nil
 }
 
-// parseValue parses value into the corresponding field.
-// In case of maps and slices it uses provided separator to split raw value string
-func parseValue(field reflect.Value, value, sep string, layout *string) error {
-	// TODO: simplify recursion
+func updateTags(val, env, envDefault string) (string, string, bool) {
+	var expended bool
 
-	valueType := field.Type()
+	if len(val) > 3 && val[0] == '$' && val[1] == '{' && val[len(val)-1] == '}' {
+		expended = true
+		parts := strings.Split(val[2:len(val)-1], ":")
 
-	// look for supported struct parser
-	// parsing of struct must be done before checking the implementation `encoding.TextUnmarshaler`
-	// standard struct types already have the implementation `encoding.TextUnmarshaler` (for example `time.Time`)
-	if structParser, found := validStructs[valueType]; found {
-		return structParser(&field, value, layout)
-	}
-
-	if field.CanInterface() {
-		if ct, ok := field.Interface().(encoding.TextUnmarshaler); ok {
-			return ct.UnmarshalText([]byte(value))
-		} else if ctp, ok := field.Addr().Interface().(encoding.TextUnmarshaler); ok {
-			return ctp.UnmarshalText([]byte(value))
-		}
-
-		if cs, ok := field.Interface().(Setter); ok {
-			return cs.SetValue(value)
-		} else if csp, ok := field.Addr().Interface().(Setter); ok {
-			return csp.SetValue(value)
-		}
-	}
-
-	switch valueType.Kind() {
-
-	// parse string value
-	case reflect.String:
-		field.SetString(value)
-
-	// parse boolean value
-	case reflect.Bool:
-		b, err := strconv.ParseBool(value)
-		if err != nil {
-			return err
-		}
-		field.SetBool(b)
-
-	// parse integer
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32:
-		number, err := strconv.ParseInt(value, 0, valueType.Bits())
-		if err != nil {
-			return err
-		}
-		field.SetInt(number)
-
-	case reflect.Int64:
-		if valueType == reflect.TypeOf(time.Duration(0)) {
-			// try to parse time
-			d, err := time.ParseDuration(value)
-			if err != nil {
-				return err
-			}
-			field.SetInt(int64(d))
+		if len(parts) > 1 {
+			env = parts[0]
+			envDefault = strings.Join(parts[1:], ":")
 		} else {
-			// parse regular integer
-			number, err := strconv.ParseInt(value, 0, valueType.Bits())
-			if err != nil {
-				return err
-			}
-			field.SetInt(number)
-		}
-
-	// parse unsigned integer value
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		number, err := strconv.ParseUint(value, 0, valueType.Bits())
-		if err != nil {
-			return err
-		}
-		field.SetUint(number)
-
-	// parse floating point value
-	case reflect.Float32, reflect.Float64:
-		number, err := strconv.ParseFloat(value, valueType.Bits())
-		if err != nil {
-			return err
-		}
-		field.SetFloat(number)
-
-	// parse sliced value
-	case reflect.Slice:
-		sliceValue, err := parseSlice(valueType, value, sep, layout)
-		if err != nil {
-			return err
-		}
-
-		field.Set(*sliceValue)
-
-	// parse mapped value
-	case reflect.Map:
-		mapValue, err := parseMap(valueType, value, sep, layout)
-		if err != nil {
-			return err
-		}
-
-		field.Set(*mapValue)
-
-	default:
-		return fmt.Errorf("unsupported type %s.%s", valueType.PkgPath(), valueType.Name())
-	}
-
-	return nil
-}
-
-// parseSlice parses value into a slice of given type
-func parseSlice(valueType reflect.Type, value string, sep string, layout *string) (*reflect.Value, error) {
-	sliceValue := reflect.MakeSlice(valueType, 0, 0)
-	if valueType.Elem().Kind() == reflect.Uint8 {
-		sliceValue = reflect.ValueOf([]byte(value))
-	} else if len(strings.TrimSpace(value)) != 0 {
-		values := strings.Split(value, sep)
-		sliceValue = reflect.MakeSlice(valueType, len(values), len(values))
-
-		for i, val := range values {
-			if err := parseValue(sliceValue.Index(i), val, sep, layout); err != nil {
-				return nil, err
-			}
+			env = parts[0]
 		}
 	}
-	return &sliceValue, nil
+
+	return env, envDefault, expended
 }
 
-// parseMap parses value into a map of given type
-func parseMap(valueType reflect.Type, value string, sep string, layout *string) (*reflect.Value, error) {
-	mapValue := reflect.MakeMap(valueType)
-	if len(strings.TrimSpace(value)) != 0 {
-		pairs := strings.SplitSeq(value, sep)
-		for pair := range pairs {
-			kvPair := strings.SplitN(pair, ":", 2)
-			if len(kvPair) != 2 {
-				return nil, fmt.Errorf("invalid map item: %q", pair)
-			}
-			k := reflect.New(valueType.Key()).Elem()
-			err := parseValue(k, kvPair[0], sep, layout)
-			if err != nil {
-				return nil, err
-			}
-			v := reflect.New(valueType.Elem()).Elem()
-			err = parseValue(v, kvPair[1], sep, layout)
-			if err != nil {
-				return nil, err
-			}
-			mapValue.SetMapIndex(k, v)
-		}
+func setupKey(out reflect.Value, index int, fileType string) string {
+	tag, ok := out.Type().Field(index).Tag.Lookup("confy")
+	if !ok {
+		tag = out.Type().Field(index).Tag.Get(fileType)
 	}
-	return &mapValue, nil
-}
 
-// structMeta is a structure metadata entity
-type structMeta struct {
-	envList     []string
-	fieldName   string
-	fieldValue  reflect.Value
-	defValue    *string
-	layout      *string
-	separator   string
-	description string
-	updatable   bool
-	required    bool
-	path        string
-}
-
-// isFieldValueZero determines if fieldValue empty or not
-func (sm *structMeta) isFieldValueZero() bool {
-	return sm.fieldValue.IsZero()
-}
-
-// parseFunc custom value parser function
-type parseFunc func(*reflect.Value, string, *string) error
-
-// Any specific supported struct can be added here
-var validStructs = map[reflect.Type]parseFunc{
-
-	reflect.TypeOf(time.Time{}): func(field *reflect.Value, value string, layout *string) error {
-		var l string
-		if layout != nil {
-			l = *layout
+	if tag != "-" {
+		if tag == "" {
+			return strings.ToLower(out.Type().Field(index).Name)
 		} else {
-			l = time.RFC3339
+			return tag
 		}
-		val, err := time.Parse(l, value)
-		if err != nil {
-			return err
-		}
-		field.Set(reflect.ValueOf(val))
-		return nil
-	},
-
-	reflect.TypeOf(url.URL{}): func(field *reflect.Value, value string, _ *string) error {
-		val, err := url.Parse(value)
-		if err != nil {
-			return err
-		}
-		field.Set(reflect.ValueOf(*val))
-		return nil
-	},
-
-	reflect.TypeOf(&time.Location{}): func(field *reflect.Value, value string, _ *string) error {
-		loc, err := time.LoadLocation(value)
-		if err != nil {
-			return err
-		}
-
-		field.Set(reflect.ValueOf(loc))
-		return nil
-	},
+	} else {
+		return ""
+	}
 }
