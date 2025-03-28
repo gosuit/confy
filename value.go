@@ -13,8 +13,6 @@ import (
 // parseValue parses value into the corresponding field.
 // In case of maps and slices it uses provided separator to split raw value string
 func parseValue(field reflect.Value, value, sep string, layout *string) error {
-	// TODO: simplify recursion
-
 	valueType := field.Type()
 
 	// look for supported struct parser
