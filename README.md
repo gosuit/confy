@@ -14,7 +14,6 @@ go get github.com/gosuit/confy
   - **YAML**
   - **JSON**
   - **TOML**
-  - **EDN**
 - **Environment Variables**: Override configuration settings with environment variables.
 - **Env Names Expand**: Set the names of environment variables through files to get the values
 - **Validation**: Validate configuration structures.

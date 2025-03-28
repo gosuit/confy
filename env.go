@@ -2,97 +2,48 @@ package confy
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"reflect"
 	"strings"
-
-	"github.com/joho/godotenv"
 )
 
 const (
-	// DefaultSeparator is a default list and map separator character
-	DefaultSeparator = ","
+	// defaultSeparator is a default list and map separator character
+	defaultSeparator = ","
 )
-
-// Setter is an interface for a custom value setter.
-//
-// To implement a custom value setter you need to add a SetValue function to your type that will receive a string raw value:
-//
-//	type MyField string
-//
-//	func (f *MyField) SetValue(s string) error {
-//		if s == "" {
-//			return fmt.Errorf("field value can't be empty")
-//		}
-//		*f = MyField("my field is: " + s)
-//		return nil
-//	}
-type Setter interface {
-	SetValue(string) error
-}
-
-// Updater gives an ability to implement custom update function for a field or a whole structure
-type Updater interface {
-	Update() error
-}
 
 // Supported tags
 const (
-	// TagEnv name of the environment variable or a list of names
-	TagEnv = "env"
+	// tagEnv name of the environment variable or a list of names
+	tagEnv = "env"
 
-	// TagEnvLayout value parsing layout (for types like time.Time)
-	TagEnvLayout = "env-layout"
+	// tagEnvLayout value parsing layout (for types like time.Time)
+	tagEnvLayout = "env-layout"
 
-	// TagEnvDefault default value
-	TagEnvDefault = "env-default"
+	// tagEnvDefault default value
+	tagEnvDefault = "env-default"
 
-	// TagEnvSeparator custom list and map separator
-	TagEnvSeparator = "env-separator"
+	// tagEnvSeparator custom list and map separator
+	tagEnvSeparator = "env-separator"
 
-	// TagEnvDescription environment variable description
-	TagEnvDescription = "env-description"
+	// tagEnvDescription environment variable description
+	tagEnvDescription = "env-description"
 
-	// TagEnvUpd flag to mark a field as updatable
-	TagEnvUpd = "env-upd"
+	// tagEnvUpd flag to mark a field as updatable
+	tagEnvUpd = "env-upd"
 
-	// TagEnvRequired flag to mark a field as required
-	TagEnvRequired = "env-required"
+	// tagEnvRequired flag to mark a field as required
+	tagEnvRequired = "env-required"
 
-	// TagEnvPrefix flag to specify prefix for structure fields
-	TagEnvPrefix = "env-prefix"
+	// tagEnvPrefix flag to specify prefix for structure fields
+	tagEnvPrefix = "env-prefix"
 )
 
-// parseENV, in fact, doesn't fill the structure with environment variable values.
-// It just parses ENV file and sets all variables to the environment.
-// Thus, the structure should be filled at the next steps.
-func parseENV(r io.Reader, _ interface{}) error {
-	vars, err := godotenv.Parse(r)
-	if err != nil {
-		return err
-	}
-
-	for env, val := range vars {
-		if err = os.Setenv(env, val); err != nil {
-			return fmt.Errorf("set environment: %w", err)
-		}
-	}
-
-	return nil
-}
-
 // readEnvVars reads environment variables to the provided configuration structure
-func readEnvVars(cfg interface{}, update bool) error {
+func readEnvVars(cfg any, update bool) error {
 	metaInfo, err := readStructMetadata(cfg)
 	if err != nil {
 		return err
-	}
-
-	if updater, ok := cfg.(Updater); ok {
-		if err = updater.Update(); err != nil {
-			return err
-		}
 	}
 
 	for _, meta := range metaInfo {
@@ -140,9 +91,9 @@ func readEnvVars(cfg interface{}, update bool) error {
 }
 
 // readStructMetadata reads structure metadata (types, tags, etc.)
-func readStructMetadata(cfgRoot interface{}) ([]structMeta, error) {
+func readStructMetadata(cfgRoot any) ([]structMeta, error) {
 	type cfgNode struct {
-		Val    interface{}
+		Val    any
 		Prefix string
 		Path   string
 	}
@@ -150,7 +101,7 @@ func readStructMetadata(cfgRoot interface{}) ([]structMeta, error) {
 	cfgStack := []cfgNode{{cfgRoot, "", ""}}
 	metas := make([]structMeta, 0)
 
-	for i := 0; i < len(cfgStack); i++ {
+	for i := range cfgStack {
 
 		s := reflect.ValueOf(cfgStack[i].Val)
 		sPrefix := cfgStack[i].Prefix
@@ -167,7 +118,7 @@ func readStructMetadata(cfgRoot interface{}) ([]structMeta, error) {
 		typeInfo := s.Type()
 
 		// read tags
-		for idx := 0; idx < s.NumField(); idx++ {
+		for idx := range s.NumField() {
 			fType := typeInfo.Field(idx)
 
 			var (
@@ -184,7 +135,7 @@ func readStructMetadata(cfgRoot interface{}) ([]structMeta, error) {
 				}
 				// add structure to parsing stack
 				if _, found := validStructs[fld.Type()]; !found {
-					prefix, _ := fType.Tag.Lookup(TagEnvPrefix)
+					prefix, _ := fType.Tag.Lookup(tagEnvPrefix)
 					cfgStack = append(cfgStack, cfgNode{
 						Val:    fld.Addr().Interface(),
 						Prefix: sPrefix + prefix,
@@ -194,7 +145,7 @@ func readStructMetadata(cfgRoot interface{}) ([]structMeta, error) {
 				}
 
 				// process time.Time
-				if l, ok := fType.Tag.Lookup(TagEnvLayout); ok {
+				if l, ok := fType.Tag.Lookup(tagEnvLayout); ok {
 					layout = &l
 				}
 			}
@@ -204,24 +155,24 @@ func readStructMetadata(cfgRoot interface{}) ([]structMeta, error) {
 				continue
 			}
 
-			if def, ok := fType.Tag.Lookup(TagEnvDefault); ok {
+			if def, ok := fType.Tag.Lookup(tagEnvDefault); ok {
 				defValue = &def
 			}
 
-			if sep, ok := fType.Tag.Lookup(TagEnvSeparator); ok {
+			if sep, ok := fType.Tag.Lookup(tagEnvSeparator); ok {
 				separator = sep
 			} else {
-				separator = DefaultSeparator
+				separator = defaultSeparator
 			}
 
-			_, upd := fType.Tag.Lookup(TagEnvUpd)
+			_, upd := fType.Tag.Lookup(tagEnvUpd)
 
-			_, required := fType.Tag.Lookup(TagEnvRequired)
+			_, required := fType.Tag.Lookup(tagEnvRequired)
 
 			envList := make([]string, 0)
 
-			if envs, ok := fType.Tag.Lookup(TagEnv); ok && len(envs) != 0 {
-				envList = strings.Split(envs, DefaultSeparator)
+			if envs, ok := fType.Tag.Lookup(tagEnv); ok && len(envs) != 0 {
+				envList = strings.Split(envs, defaultSeparator)
 				if sPrefix != "" {
 					for i := range envList {
 						envList[i] = sPrefix + envList[i]
@@ -236,7 +187,7 @@ func readStructMetadata(cfgRoot interface{}) ([]structMeta, error) {
 				defValue:    defValue,
 				layout:      layout,
 				separator:   separator,
-				description: fType.Tag.Get(TagEnvDescription),
+				description: fType.Tag.Get(tagEnvDescription),
 				updatable:   upd,
 				required:    required,
 				path:        cfgStack[i].Path,
