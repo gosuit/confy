@@ -35,6 +35,16 @@ func setupValue(field reflect.Value, val any, env, envDefault, fileType, separat
 		}
 	}
 
+	if sval, ok := val.(string); ok {
+		if field.CanInterface() {
+			if ct, ok := field.Interface().(encoding.TextUnmarshaler); ok {
+				return ct.UnmarshalText([]byte(sval))
+			} else if ctp, ok := field.Addr().Interface().(encoding.TextUnmarshaler); ok {
+				return ctp.UnmarshalText([]byte(sval))
+			}
+		}
+	}
+
 	switch field.Kind() {
 
 	case reflect.Interface:
