@@ -17,6 +17,10 @@ func mergeStruct(data map[string]any, out reflect.Value, fileType string) error 
 	for i := range out.NumField() {
 		field := out.Field(i)
 
+		if !field.IsZero() {
+			continue
+		}
+
 		env := out.Type().Field(i).Tag.Get(tagEnv)
 		envDefault := out.Type().Field(i).Tag.Get(tagEnvDefault)
 
