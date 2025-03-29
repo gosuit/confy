@@ -1,19 +1,47 @@
 package confy
 
-import "github.com/go-playground/validator/v10"
+import (
+	"io/fs"
+	"os"
+	"path/filepath"
+
+	"github.com/go-playground/validator/v10"
+)
 
 // Get reads config from file and override values with environment variables.
 func Get(path string, cfg any) error {
-	err := parseFile(path, cfg)
+	fi, err := os.Stat(path)
 	if err != nil {
 		return err
 	}
 
-	validate := validator.New()
+	if fi.IsDir() {
+		paths := make([]string, 0)
 
-	err = validate.Struct(cfg)
-	if err != nil {
-		return err
+		err := filepath.Walk(path, func(path string, info fs.FileInfo, err error) error {
+			if !info.IsDir() {
+				paths = append(paths, path)
+			}
+
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+
+		return GetMany(cfg, paths...)
+	} else {
+		err := parseFile(path, cfg)
+		if err != nil {
+			return err
+		}
+
+		validate := validator.New()
+
+		err = validate.Struct(cfg)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
