@@ -1,6 +1,7 @@
 package confy
 
 import (
+	"encoding"
 	"errors"
 	"os"
 	"reflect"
@@ -33,6 +34,18 @@ func mergeStruct(data map[string]any, out reflect.Value, fileType string) error 
 
 		val, ok := data[key]
 		if !ok {
+			_, found := validStructs[field.Type()]
+			_, text := field.Interface().(encoding.TextUnmarshaler)
+			_, pointer := field.Addr().Interface().(encoding.TextUnmarshaler)
+
+			if field.Kind() == reflect.Struct && !found && !text && !pointer {
+				if err := mergeStruct(make(map[string]any), field, fileType); err != nil {
+					return err
+				}
+
+				continue
+			}
+
 			eval, ok := os.LookupEnv(env)
 			if ok {
 				if err := parseValue(field, eval, separator, &layout); err != nil {
