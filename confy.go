@@ -31,7 +31,7 @@ func Get(path string, cfg any) error {
 
 		return GetMany(cfg, paths...)
 	} else {
-		err := parseFile(path, cfg)
+		err := parseFile(path, cfg, true)
 		if err != nil {
 			return err
 		}
@@ -49,8 +49,22 @@ func Get(path string, cfg any) error {
 
 // GetMany reads config from multiple files and override values with environment variables.
 func GetMany(cfg any, files ...string) error {
-	for _, path := range files {
-		if err := Get(path, cfg); err != nil {
+	for i, path := range files {
+		last := false
+
+		if i == len(files)-1 {
+			last = true
+		}
+
+		err := parseFile(path, cfg, last)
+		if err != nil {
+			return err
+		}
+
+		validate := validator.New()
+
+		err = validate.Struct(cfg)
+		if err != nil {
 			return err
 		}
 	}

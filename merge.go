@@ -13,7 +13,7 @@ type structKey struct {
 	Required bool
 }
 
-func mergeStruct(data map[string]any, out reflect.Value, fileType string) error {
+func mergeStruct(data map[string]any, out reflect.Value, fileType string, last bool) error {
 	for i := range out.NumField() {
 		field := out.Field(i)
 
@@ -38,12 +38,16 @@ func mergeStruct(data map[string]any, out reflect.Value, fileType string) error 
 
 		val, ok := data[key]
 		if !ok {
+			if !last {
+				continue
+			}
+
 			_, found := validStructs[field.Type()]
 			_, text := field.Interface().(encoding.TextUnmarshaler)
 			_, pointer := field.Addr().Interface().(encoding.TextUnmarshaler)
 
 			if field.Kind() == reflect.Struct && !found && !text && !pointer {
-				if err := mergeStruct(make(map[string]any), field, fileType); err != nil {
+				if err := mergeStruct(make(map[string]any), field, fileType, last); err != nil {
 					return err
 				}
 
@@ -67,7 +71,7 @@ func mergeStruct(data map[string]any, out reflect.Value, fileType string) error 
 				}
 			}
 		} else {
-			if err := setupValue(field, val, env, envDefault, fileType, separator, layout); err != nil {
+			if err := setupValue(field, val, env, envDefault, fileType, separator, layout, last); err != nil {
 				return err
 			}
 		}

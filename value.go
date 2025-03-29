@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func setupValue(field reflect.Value, val any, env, envDefault, fileType, separator, layout string) error {
+func setupValue(field reflect.Value, val any, env, envDefault, fileType, separator, layout string, last bool) error {
 	var expanded bool
 	if sval, ok := val.(string); ok {
 		env, envDefault, expanded = updateTags(sval, env, envDefault)
@@ -61,7 +61,7 @@ func setupValue(field reflect.Value, val any, env, envDefault, fileType, separat
 			for k, v := range mval {
 				newVal := reflect.New(field.Type().Elem()).Elem()
 
-				if err := setupValue(newVal, v, "", "", fileType, separator, layout); err != nil {
+				if err := setupValue(newVal, v, "", "", fileType, separator, layout, last); err != nil {
 					return err
 				}
 
@@ -84,7 +84,7 @@ func setupValue(field reflect.Value, val any, env, envDefault, fileType, separat
 			for i := range aval {
 				newVal := reflect.New(field.Type().Elem()).Elem()
 
-				if err := setupValue(newVal, aval[i], "", "", fileType, separator, layout); err != nil {
+				if err := setupValue(newVal, aval[i], "", "", fileType, separator, layout, last); err != nil {
 					return err
 				}
 
@@ -99,7 +99,7 @@ func setupValue(field reflect.Value, val any, env, envDefault, fileType, separat
 			for i := range sval {
 				newVal := reflect.New(field.Type().Elem()).Elem()
 
-				if err := setupValue(newVal, sval[i], "", "", fileType, separator, layout); err != nil {
+				if err := setupValue(newVal, sval[i], "", "", fileType, separator, layout, last); err != nil {
 					return err
 				}
 
@@ -111,7 +111,7 @@ func setupValue(field reflect.Value, val any, env, envDefault, fileType, separat
 
 	case reflect.Struct:
 		if mval, ok := val.(map[string]any); ok {
-			if err := mergeStruct(mval, field, ""); err != nil {
+			if err := mergeStruct(mval, field, "", last); err != nil {
 				return err
 			}
 		} else {
@@ -121,7 +121,7 @@ func setupValue(field reflect.Value, val any, env, envDefault, fileType, separat
 	case reflect.Ptr:
 		newField := reflect.New(field.Type().Elem()).Elem()
 
-		if err := setupValue(newField, val, "", "", fileType, separator, layout); err != nil {
+		if err := setupValue(newField, val, "", "", fileType, separator, layout, last); err != nil {
 			return err
 		}
 

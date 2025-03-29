@@ -14,7 +14,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func parseFile(path string, cfg any) error {
+func parseFile(path string, cfg any, last bool) error {
 	// open the configuration file
 	f, err := os.OpenFile(path, os.O_RDONLY|os.O_SYNC, 0)
 	if err != nil {
@@ -25,11 +25,11 @@ func parseFile(path string, cfg any) error {
 	// parse the file depending on the file type
 	switch ext := strings.ToLower(filepath.Ext(path)); ext {
 	case ".yaml", ".yml":
-		err = parseYAML(f, cfg)
+		err = parseYAML(f, cfg, last)
 	case ".json":
-		err = parseJSON(f, cfg)
+		err = parseJSON(f, cfg, last)
 	case ".toml":
-		err = parseTOML(f, cfg)
+		err = parseTOML(f, cfg, last)
 	default:
 		return fmt.Errorf("file format '%s' doesn't supported by the parser", ext)
 	}
@@ -41,7 +41,7 @@ func parseFile(path string, cfg any) error {
 }
 
 // ParseYAML parses YAML from reader to data structure
-func parseYAML(r io.Reader, str any) error {
+func parseYAML(r io.Reader, str any, last bool) error {
 	var data map[string]any
 
 	b, err := io.ReadAll(r)
@@ -66,7 +66,7 @@ func parseYAML(r io.Reader, str any) error {
 		return errors.New("config must be struct")
 	}
 
-	if err := mergeStruct(data, out, "yaml"); err != nil {
+	if err := mergeStruct(data, out, "yaml", last); err != nil {
 		return err
 	}
 
@@ -74,7 +74,7 @@ func parseYAML(r io.Reader, str any) error {
 }
 
 // ParseTOML parses TOML from reader to data structure
-func parseTOML(r io.Reader, str any) error {
+func parseTOML(r io.Reader, str any, last bool) error {
 	var data map[string]any
 
 	b, err := io.ReadAll(r)
@@ -99,7 +99,7 @@ func parseTOML(r io.Reader, str any) error {
 		return errors.New("config must be struct")
 	}
 
-	if err := mergeStruct(data, out, "toml"); err != nil {
+	if err := mergeStruct(data, out, "toml", last); err != nil {
 		return err
 	}
 
@@ -107,7 +107,7 @@ func parseTOML(r io.Reader, str any) error {
 }
 
 // ParseJSON parses JSON from reader to data structure
-func parseJSON(r io.Reader, str any) error {
+func parseJSON(r io.Reader, str any, last bool) error {
 	var data map[string]any
 
 	b, err := io.ReadAll(r)
@@ -131,7 +131,7 @@ func parseJSON(r io.Reader, str any) error {
 		return errors.New("config must be struct")
 	}
 
-	if err := mergeStruct(data, out, "json"); err != nil {
+	if err := mergeStruct(data, out, "json", last); err != nil {
 		return err
 	}
 
