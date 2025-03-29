@@ -19,6 +19,17 @@ func Get(path string, cfg any) error {
 	return nil
 }
 
+// GetMany reads config from multiple files and override values with environment variables.
+func GetMany(cfg any, files ...string) error {
+	for _, path := range files {
+		if err := Get(path, cfg); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // GetEnv reads environment variables into the structure.
 func GetEnv(cfg any) error {
 	err := readEnvVars(cfg, false)
