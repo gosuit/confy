@@ -148,6 +148,8 @@ func main() {
 
 You can also read config from multiple files.
 
+**IMPORTANT**: For multiple read you can use only "confy" or "yaml" tag.
+
 ```yaml
 # database.yaml
 

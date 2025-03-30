@@ -4,6 +4,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -20,7 +22,11 @@ func Get(path string, cfg any) error {
 
 		err := filepath.Walk(path, func(path string, info fs.FileInfo, err error) error {
 			if !info.IsDir() {
-				paths = append(paths, path)
+				ext := strings.ToLower(filepath.Ext(path))
+
+				if slices.Contains(validExt, ext) {
+					paths = append(paths, path)
+				}
 			}
 
 			return nil
@@ -31,42 +37,29 @@ func Get(path string, cfg any) error {
 
 		return GetMany(cfg, paths...)
 	} else {
-		err := parseFile(path, cfg, true)
+		err := parseFile(path, cfg)
 		if err != nil {
 			return err
 		}
 
 		validate := validator.New()
 
-		err = validate.Struct(cfg)
-		if err != nil {
-			return err
-		}
+		return validate.Struct(cfg)
 	}
-
-	return nil
 }
 
 // GetMany reads config from multiple files and override values with environment variables.
 func GetMany(cfg any, files ...string) error {
-	for i, path := range files {
-		last := false
+	err := parseMultiple(files, cfg)
+	if err != nil {
+		return err
+	}
 
-		if i == len(files)-1 {
-			last = true
-		}
+	validate := validator.New()
 
-		err := parseFile(path, cfg, last)
-		if err != nil {
-			return err
-		}
-
-		validate := validator.New()
-
-		err = validate.Struct(cfg)
-		if err != nil {
-			return err
-		}
+	err = validate.Struct(cfg)
+	if err != nil {
+		return err
 	}
 
 	return nil

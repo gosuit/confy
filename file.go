@@ -14,7 +14,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func parseFile(path string, cfg any, last bool) error {
+var (
+	validExt = []string{".yaml", ".yml", ".json", ".toml"}
+)
+
+func parseFile(path string, cfg any) error {
 	// open the configuration file
 	f, err := os.OpenFile(path, os.O_RDONLY|os.O_SYNC, 0)
 	if err != nil {
@@ -22,14 +26,20 @@ func parseFile(path string, cfg any, last bool) error {
 	}
 	defer f.Close()
 
+	var data map[string]any
+	var fileType string
+
 	// parse the file depending on the file type
 	switch ext := strings.ToLower(filepath.Ext(path)); ext {
 	case ".yaml", ".yml":
-		err = parseYAML(f, cfg, last)
+		fileType = "yaml"
+		err = parseYAML(f, &data)
 	case ".json":
-		err = parseJSON(f, cfg, last)
+		fileType = "json"
+		err = parseJSON(f, &data)
 	case ".toml":
-		err = parseTOML(f, cfg, last)
+		fileType = "toml"
+		err = parseTOML(f, &data)
 	default:
 		return fmt.Errorf("file format '%s' doesn't supported by the parser", ext)
 	}
@@ -37,103 +47,104 @@ func parseFile(path string, cfg any, last bool) error {
 		return fmt.Errorf("config file parsing error: %s", err.Error())
 	}
 
-	return nil
+	out := reflect.ValueOf(cfg)
+
+	if out.Kind() == reflect.Ptr && !out.IsNil() {
+		out = out.Elem()
+	} else {
+		return errors.New("config struct must be pointer and not nil")
+	}
+
+	if out.Kind() != reflect.Struct {
+		return errors.New("config must be struct")
+	}
+
+	return mergeStruct(data, out, fileType)
+}
+
+func parseMultiple(paths []string, cfg any) error {
+	data := make(map[string]any)
+
+	for _, path := range paths {
+		// open the configuration file
+		f, err := os.OpenFile(path, os.O_RDONLY|os.O_SYNC, 0)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+
+		var newData map[string]any
+
+		// parse the file depending on the file type
+		switch ext := strings.ToLower(filepath.Ext(path)); ext {
+		case ".yaml", ".yml":
+			err = parseYAML(f, &newData)
+		case ".json":
+			err = parseJSON(f, &newData)
+		case ".toml":
+			err = parseTOML(f, &newData)
+		default:
+			return fmt.Errorf("file format '%s' doesn't supported by the parser", ext)
+		}
+		if err != nil {
+			return fmt.Errorf("config file parsing error: %s", err.Error())
+		}
+
+		data = mergeMaps(data, newData)
+	}
+
+	out := reflect.ValueOf(cfg)
+
+	if out.Kind() == reflect.Ptr && !out.IsNil() {
+		out = out.Elem()
+	} else {
+		return errors.New("config struct must be pointer and not nil")
+	}
+
+	if out.Kind() != reflect.Struct {
+		return errors.New("config must be struct")
+	}
+
+	return mergeStruct(data, out, "yaml")
+}
+
+func mergeMaps(dst, src map[string]any) map[string]any {
+	for key, val := range src {
+		if dstVal, present := dst[key]; present {
+			dst[key] = mergeMaps(dstVal.(map[string]any), val.(map[string]any))
+		} else {
+			dst[key] = val
+		}
+	}
+	return dst
 }
 
 // ParseYAML parses YAML from reader to data structure
-func parseYAML(r io.Reader, str any, last bool) error {
-	var data map[string]any
-
+func parseYAML(r io.Reader, data *map[string]any) error {
 	b, err := io.ReadAll(r)
 	if err != nil {
 		return err
 	}
 
-	err = yaml.Unmarshal(b, &data)
-	if err != nil {
-		return err
-	}
-
-	out := reflect.ValueOf(str)
-
-	if out.Kind() == reflect.Ptr && !out.IsNil() {
-		out = out.Elem()
-	} else {
-		return errors.New("config struct must be pointer and not nil")
-	}
-
-	if out.Kind() != reflect.Struct {
-		return errors.New("config must be struct")
-	}
-
-	if err := mergeStruct(data, out, "yaml", last); err != nil {
-		return err
-	}
-
-	return nil
+	return yaml.Unmarshal(b, data)
 }
 
 // ParseTOML parses TOML from reader to data structure
-func parseTOML(r io.Reader, str any, last bool) error {
-	var data map[string]any
-
+func parseTOML(r io.Reader, data *map[string]any) error {
 	b, err := io.ReadAll(r)
 	if err != nil {
 		return err
 	}
 
-	err = toml.Unmarshal(b, &data)
-	if err != nil {
-		return err
-	}
-
-	out := reflect.ValueOf(str)
-
-	if out.Kind() == reflect.Ptr && !out.IsNil() {
-		out = out.Elem()
-	} else {
-		return errors.New("config struct must be pointer and not nil")
-	}
-
-	if out.Kind() != reflect.Struct {
-		return errors.New("config must be struct")
-	}
-
-	if err := mergeStruct(data, out, "toml", last); err != nil {
-		return err
-	}
-
-	return nil
+	return toml.Unmarshal(b, data)
 }
 
 // ParseJSON parses JSON from reader to data structure
-func parseJSON(r io.Reader, str any, last bool) error {
-	var data map[string]any
-
+func parseJSON(r io.Reader, data *map[string]any) error {
 	b, err := io.ReadAll(r)
 	if err != nil {
 		return err
 	}
 
-	if err := json.Unmarshal(b, &data); err != nil {
-		return err
-	}
-
-	out := reflect.ValueOf(str)
-
-	if out.Kind() == reflect.Ptr && !out.IsNil() {
-		out = out.Elem()
-	} else {
-		return errors.New("config struct must be pointer and not nil")
-	}
-
-	if out.Kind() != reflect.Struct {
-		return errors.New("config must be struct")
-	}
-
-	if err := mergeStruct(data, out, "json", last); err != nil {
-		return err
-	}
-
-	return nil
+	return json.Unmarshal(b, data)
 }
