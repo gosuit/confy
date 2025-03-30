@@ -64,6 +64,7 @@ func parseFile(path string, cfg any) error {
 
 func parseMultiple(paths []string, cfg any) error {
 	data := make(map[string]any)
+	fileType := "yaml"
 
 	for _, path := range paths {
 		// open the configuration file
@@ -78,10 +79,13 @@ func parseMultiple(paths []string, cfg any) error {
 		// parse the file depending on the file type
 		switch ext := strings.ToLower(filepath.Ext(path)); ext {
 		case ".yaml", ".yml":
+			fileType = "yaml"
 			err = parseYAML(f, &newData)
 		case ".json":
+			fileType = "json"
 			err = parseJSON(f, &newData)
 		case ".toml":
+			fileType = "toml"
 			err = parseTOML(f, &newData)
 		default:
 			return fmt.Errorf("file format '%s' doesn't supported by the parser", ext)
@@ -105,7 +109,7 @@ func parseMultiple(paths []string, cfg any) error {
 		return errors.New("config must be struct")
 	}
 
-	return mergeStruct(data, out, "yaml")
+	return mergeStruct(data, out, fileType)
 }
 
 func mergeMaps(dst, src map[string]any) map[string]any {

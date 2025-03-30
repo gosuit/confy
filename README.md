@@ -148,7 +148,9 @@ func main() {
 
 You can also read config from multiple files.
 
-**IMPORTANT**: For multiple read you can use only "confy" or "yaml" tag.
+You can do this using the GetMany function (example below), or the Get function by passing the path to the **directory**.
+
+**IMPORTANT**: If you want to use different types of files, you can only use the "confy" tag. However, if all files have the same type, you can use the tag corresponding to the desired type.
 
 ```yaml
 # database.yaml
