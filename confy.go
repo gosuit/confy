@@ -10,7 +10,7 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-// Get reads config from file and override values with environment variables.
+// Get reads config from file or directory and override values with environment variables.
 func Get(path string, cfg any) error {
 	fi, err := os.Stat(path)
 	if err != nil {

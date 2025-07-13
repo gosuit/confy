@@ -31,7 +31,7 @@ func setupValue(field reflect.Value, val any, env, envDefault, fileType, separat
 		if sval, ok := val.(string); ok {
 			return structParser(&field, sval, &layout)
 		} else {
-			return errors.New("invalid input data.")
+			return errors.New("invalid input data")
 		}
 	}
 
@@ -52,7 +52,7 @@ func setupValue(field reflect.Value, val any, env, envDefault, fileType, separat
 
 	case reflect.Map:
 		if field.Type().Key().Kind() != reflect.String {
-			return errors.New("Map key must be string")
+			return errors.New("map key must be string")
 		}
 
 		newMap := reflect.MakeMap(field.Type())
@@ -70,7 +70,7 @@ func setupValue(field reflect.Value, val any, env, envDefault, fileType, separat
 				newMap.SetMapIndex(newKey, newVal)
 			}
 		} else {
-			return errors.New("Value for map must be map")
+			return errors.New("value for map must be map")
 		}
 
 		field.Set(newMap)
@@ -78,7 +78,7 @@ func setupValue(field reflect.Value, val any, env, envDefault, fileType, separat
 	case reflect.Array:
 		if aval, ok := val.([]any); ok {
 			if len(aval) > field.Type().Len() {
-				return errors.New("Input array is longer then expected")
+				return errors.New("input array is longer then expected")
 			}
 
 			for i := range aval {
@@ -91,7 +91,7 @@ func setupValue(field reflect.Value, val any, env, envDefault, fileType, separat
 				field.Index(i).Set(newVal)
 			}
 		} else {
-			return errors.New("Value for array must be array")
+			return errors.New("value for array must be array")
 		}
 
 	case reflect.Slice:
@@ -106,7 +106,7 @@ func setupValue(field reflect.Value, val any, env, envDefault, fileType, separat
 				field.Set(reflect.Append(field, newVal))
 			}
 		} else {
-			return errors.New("Value for slice must be slice")
+			return errors.New("value for slice must be slice")
 		}
 
 	case reflect.Struct:
@@ -115,7 +115,7 @@ func setupValue(field reflect.Value, val any, env, envDefault, fileType, separat
 				return err
 			}
 		} else {
-			return errors.New("Value for struct must be struct")
+			return errors.New("value for struct must be struct")
 		}
 
 	case reflect.Ptr:
@@ -131,14 +131,14 @@ func setupValue(field reflect.Value, val any, env, envDefault, fileType, separat
 		if sval, ok := val.(string); ok {
 			field.SetString(sval)
 		} else {
-			return errors.New("Value for string must be string")
+			return errors.New("value for string must be string")
 		}
 
 	case reflect.Bool:
 		if bval, ok := val.(bool); ok {
 			field.SetBool(bval)
 		} else {
-			return errors.New("Value for bool must be bool")
+			return errors.New("value for bool must be bool")
 		}
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32:
@@ -146,10 +146,10 @@ func setupValue(field reflect.Value, val any, env, envDefault, fileType, separat
 			if !field.OverflowInt(int64(ival)) {
 				field.SetInt(int64(ival))
 			} else {
-				return errors.New("Value for int is overflowed")
+				return errors.New("value for int is overflowed")
 			}
 		} else {
-			return errors.New("Value for int must be int")
+			return errors.New("value for int must be int")
 		}
 
 	case reflect.Int64:
@@ -164,10 +164,10 @@ func setupValue(field reflect.Value, val any, env, envDefault, fileType, separat
 			if !field.OverflowInt(int64(ival)) {
 				field.SetInt(int64(ival))
 			} else {
-				return errors.New("Value for int is overflowed")
+				return errors.New("value for int is overflowed")
 			}
 		} else {
-			return errors.New("Value for int must be int")
+			return errors.New("value for int must be int")
 		}
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
@@ -175,10 +175,10 @@ func setupValue(field reflect.Value, val any, env, envDefault, fileType, separat
 			if !field.OverflowUint(uint64(uval)) {
 				field.SetUint(uint64(uval))
 			} else {
-				return errors.New("Value for uint is overflowed")
+				return errors.New("value for uint is overflowed")
 			}
 		} else {
-			return errors.New("Value for uint must be uint")
+			return errors.New("value for uint must be uint")
 		}
 
 	case reflect.Float32, reflect.Float64:
@@ -186,14 +186,14 @@ func setupValue(field reflect.Value, val any, env, envDefault, fileType, separat
 			if !field.OverflowFloat(fval) {
 				field.SetFloat(fval)
 			} else {
-				return errors.New("Value for float is overflowed")
+				return errors.New("value for float is overflowed")
 			}
 		} else {
-			return errors.New("Value for float must be float")
+			return errors.New("value for float must be float")
 		}
 
 	default:
-		return errors.New("Unsupported value type")
+		return errors.New("unsupported value type")
 	}
 
 	return nil

@@ -8,11 +8,6 @@ import (
 	"strings"
 )
 
-type structKey struct {
-	Value    string
-	Required bool
-}
-
 func mergeStruct(data map[string]any, out reflect.Value, fileType string) error {
 	for i := range out.NumField() {
 		field := out.Field(i)
