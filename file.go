@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -151,4 +153,34 @@ func parseJSON(r io.Reader, data *map[string]any) error {
 	}
 
 	return json.Unmarshal(b, data)
+}
+
+func getFilesFromDir(path string) ([]string, error) {
+	paths := make([]string, 0)
+
+	err := filepath.Walk(path, func(path string, info fs.FileInfo, err error) error {
+		if !info.IsDir() {
+			ext := strings.ToLower(filepath.Ext(path))
+
+			if slices.Contains(validExt, ext) {
+				paths = append(paths, path)
+			}
+		}
+
+		return nil
+	})
+
+	return paths, err
+}
+
+func getAllPathsFromDir(path string) ([]string, error) {
+	paths := make([]string, 0)
+
+	err := filepath.Walk(path, func(path string, info fs.FileInfo, err error) error {
+		paths = append(paths, path)
+
+		return nil
+	})
+
+	return paths, err
 }

@@ -1,49 +1,145 @@
 package confy
 
 import (
+	"fmt"
 	"os"
-	"path"
+	"path/filepath"
+	"slices"
 )
 
 type Reader interface {
-	WithRootPath(path string) Reader
-	WithEnvVariableName(name string) Reader
+	SetRootPath(path string) Reader
+	SetEnvVariableName(name string) Reader
+	SetReadAll(readAll bool) Reader
+	AddSource(source string) Reader
 	Read(cfg any) error
 }
 
 type reader struct {
 	rootPath   string
 	envVarName string
+	readAll    bool
+	sources    []string
 }
 
 func NewReader() Reader {
 	return &reader{
-		rootPath:   "./config",
+		rootPath:   "config",
 		envVarName: "ENVIRONMENT",
+		readAll:    true,
+		sources:    make([]string, 0),
 	}
 }
 
-func (r *reader) WithRootPath(path string) Reader {
-	return &reader{
-		rootPath:   path,
-		envVarName: r.envVarName,
-	}
+func (r *reader) SetRootPath(path string) Reader {
+	r.rootPath = path
+
+	return r
 }
 
-func (r *reader) WithEnvVariableName(name string) Reader {
-	return &reader{
-		rootPath:   r.rootPath,
-		envVarName: name,
+func (r *reader) SetEnvVariableName(name string) Reader {
+	r.envVarName = name
+
+	return r
+}
+
+func (r *reader) SetReadAll(readAll bool) Reader {
+	r.readAll = readAll
+
+	return r
+}
+
+func (r *reader) AddSource(source string) Reader {
+	if r.readAll {
+		panic("you can`t add source for reader when ReadAll = true")
 	}
+
+	r.sources = append(r.sources, source)
+
+	return r
 }
 
 func (r *reader) Read(cfg any) error {
-	dir, ok := os.LookupEnv(r.envVarName)
+	env, ok := os.LookupEnv(r.envVarName)
 	if !ok {
-		dir = "local"
+		env = "local"
 	}
 
-	path := path.Join(r.rootPath, dir)
+	paths, err := getAllPathsFromDir(r.rootPath)
+	if err != nil {
+		return err
+	}
 
-	return Get(path, cfg)
+	dirSource := filepath.Join(r.rootPath, env)
+	yamlSource := filepath.Join(r.rootPath, env+".yaml")
+	ymlSource := filepath.Join(r.rootPath, env+".yml")
+	jsonSource := filepath.Join(r.rootPath, env+".json")
+	tomlSource := filepath.Join(r.rootPath, env+".toml")
+
+	dirSourceExists := slices.Contains(paths, dirSource)
+	fileSourceExists := slices.Contains(paths, yamlSource) ||
+		slices.Contains(paths, ymlSource) ||
+		slices.Contains(paths, jsonSource) ||
+		slices.Contains(paths, tomlSource)
+
+	if dirSourceExists && fileSourceExists {
+		panic("you can't use directory source and file source at the same time")
+	} else if !dirSourceExists && !fileSourceExists {
+		panic("not a single source was found")
+	} else if fileSourceExists {
+		filePath := ""
+		fileFound := false
+
+		if slices.Contains(paths, yamlSource) {
+			fileFound = true
+			filePath = yamlSource
+		}
+
+		if slices.Contains(paths, ymlSource) {
+			if fileFound {
+				panic("there can only be one file source")
+			}
+
+			fileFound = true
+			filePath = ymlSource
+		}
+
+		if slices.Contains(paths, jsonSource) {
+			if fileFound {
+				panic("there can only be one file source")
+			}
+
+			fileFound = true
+			filePath = jsonSource
+		}
+
+		if slices.Contains(paths, tomlSource) {
+			if fileFound {
+				panic("there can only be one file source")
+			}
+
+			filePath = tomlSource
+		}
+
+		return Get(filePath, cfg)
+	} else {
+		if r.readAll {
+			return Get(dirSource, cfg)
+		} else {
+			//TODO: add special sources for env support
+			toRead := r.sources
+
+			for i := range toRead {
+				path := filepath.Join(dirSource, toRead[i])
+
+				if !slices.Contains(paths, path) {
+					panic(fmt.Sprintf("source %s wasn`t found", path))
+				}
+
+				toRead[i] = path
+			}
+
+			return GetMany(cfg, paths...)
+		}
+	}
 }

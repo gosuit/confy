@@ -1,11 +1,7 @@
 package confy
 
 import (
-	"io/fs"
 	"os"
-	"path/filepath"
-	"slices"
-	"strings"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -18,19 +14,7 @@ func Get(path string, cfg any) error {
 	}
 
 	if fi.IsDir() {
-		paths := make([]string, 0)
-
-		err := filepath.Walk(path, func(path string, info fs.FileInfo, err error) error {
-			if !info.IsDir() {
-				ext := strings.ToLower(filepath.Ext(path))
-
-				if slices.Contains(validExt, ext) {
-					paths = append(paths, path)
-				}
-			}
-
-			return nil
-		})
+		paths, err := getFilesFromDir(path)
 		if err != nil {
 			return err
 		}
