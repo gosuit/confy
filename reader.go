@@ -12,7 +12,7 @@ type Reader interface {
 	SetEnvVariableName(name string) Reader
 	SetReadAll(readAll bool) Reader
 	AddSource(source string) Reader
-	Read(cfg any) error
+	Read(to any) error
 }
 
 type reader struct {
@@ -59,7 +59,7 @@ func (r *reader) AddSource(source string) Reader {
 	return r
 }
 
-func (r *reader) Read(cfg any) error {
+func (r *reader) Read(to any) error {
 	env, ok := os.LookupEnv(r.envVarName)
 	if !ok {
 		env = "local"
@@ -121,10 +121,10 @@ func (r *reader) Read(cfg any) error {
 			filePath = tomlSource
 		}
 
-		return Get(filePath, cfg)
+		return Read(to, filePath)
 	} else {
 		if r.readAll {
-			return Get(dirSource, cfg)
+			return Read(to, dirSource)
 		} else {
 			//TODO: add special sources for env support
 			toRead := r.sources
@@ -139,7 +139,7 @@ func (r *reader) Read(cfg any) error {
 				toRead[i] = path
 			}
 
-			return GetMany(cfg, paths...)
+			return ReadMany(to, paths...)
 		}
 	}
 }

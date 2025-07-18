@@ -6,42 +6,42 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-// Get reads config from file or directory and override values with environment variables.
-func Get(path string, cfg any) error {
-	fi, err := os.Stat(path)
+// Read reads config from file or directory and override values with environment variables.
+func Read(to any, from string) error {
+	fi, err := os.Stat(from)
 	if err != nil {
 		return err
 	}
 
 	if fi.IsDir() {
-		paths, err := getFilesFromDir(path)
+		paths, err := getFilesFromDir(from)
 		if err != nil {
 			return err
 		}
 
-		return GetMany(cfg, paths...)
+		return ReadMany(to, paths...)
 	} else {
-		err := parseFile(path, cfg)
+		err := parseFile(from, to)
 		if err != nil {
 			return err
 		}
 
 		validate := validator.New()
 
-		return validate.Struct(cfg)
+		return validate.Struct(to)
 	}
 }
 
-// GetMany reads config from multiple files and override values with environment variables.
-func GetMany(cfg any, files ...string) error {
-	err := parseMultiple(files, cfg)
+// ReadMany reads config from multiple files and override values with environment variables.
+func ReadMany(to any, from ...string) error {
+	err := parseMultiple(from, to)
 	if err != nil {
 		return err
 	}
 
 	validate := validator.New()
 
-	err = validate.Struct(cfg)
+	err = validate.Struct(to)
 	if err != nil {
 		return err
 	}
@@ -49,16 +49,16 @@ func GetMany(cfg any, files ...string) error {
 	return nil
 }
 
-// GetEnv reads environment variables into the structure.
-func GetEnv(cfg any) error {
-	err := readEnvVars(cfg, false)
+// ReadEnv reads environment variables into the structure.
+func ReadEnv(to any) error {
+	err := readEnvVars(to, false)
 	if err != nil {
 		return err
 	}
 
 	validate := validator.New()
 
-	err = validate.Struct(cfg)
+	err = validate.Struct(to)
 	if err != nil {
 		return err
 	}
