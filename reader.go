@@ -139,7 +139,7 @@ func (r *reader) Read(to any) error {
 				toRead[i] = path
 			}
 
-			return ReadMany(to, paths...)
+			return ReadMany(to, toRead...)
 		}
 	}
 }
