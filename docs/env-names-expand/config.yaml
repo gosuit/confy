@@ -1,0 +1,7 @@
+# The value will be taken from the DB_HOST variable, 
+# but if the variable is missing, 
+# the default value "0.0.0.0" will be taken
+host:      "${DB_HOST:0.0.0.0}"
+
+# The value will be taken from the DB_PASSWORD variable
+password:  "${DB_PASSWORD}" 
