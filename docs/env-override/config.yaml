@@ -1,6 +1,0 @@
-database:
-  host: "localhost"
-  username: "user"
-
-api:
-  url: "http://example.com"
