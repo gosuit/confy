@@ -27,6 +27,7 @@ go get github.com/gosuit/confy
 - [Env names expand](docs/env-names-expand)
 - [Environment only](docs/env-only)
 - [Multiple files read](docs/multiple-files)
+- [Directory read](docs/directory)
 - [Reader](docs/reader)
 - [Validation](docs/validation)
 
