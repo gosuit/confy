@@ -24,7 +24,3 @@ const (
 	defaultEnvVarName = "ENVIRONMENT"
 	defaultSeparator  = ";"
 )
-
-var (
-	validExtensions = []string{".yaml", ".yml", ".json", ".toml"}
-)

@@ -5,55 +5,26 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/joho/godotenv"
 	"gopkg.in/yaml.v3"
 )
 
-func parseFile(path string) (map[string]any, string, error) {
-	f, err := os.OpenFile(path, os.O_RDONLY, 0)
-	if err != nil {
-		return nil, "", err
-	}
-	defer f.Close()
-
-	b, err := io.ReadAll(f)
-	if err != nil {
-		return nil, "", err
-	}
-
-	var data map[string]any
-	var fileTag string
-
-	switch ext := strings.ToLower(filepath.Ext(path)); ext {
-	case ".yaml", ".yml":
-		err = parseYAML(b, &data)
-		fileTag = yamlTag
-	case ".json":
-		err = parseJSON(b, &data)
-		fileTag = jsonTag
-	case ".toml":
-		err = parseTOML(b, &data)
-		fileTag = tomlTag
-	default:
-		return nil, "", fmt.Errorf("file format '%s' doesn't supported by confy", ext)
-	}
-
-	if err != nil {
-		return nil, "", err
-	}
-
-	return data, fileTag, nil
-}
+var (
+	validExtensions = []string{".yaml", ".yml", ".json", ".toml", ".env"}
+)
 
 func parseMultipleFiles(paths []string) (map[string]any, error) {
 	data := make(map[string]any)
 
 	for _, path := range paths {
-		newData, _, err := parseFile(path)
+		newData, err := parseFile(path)
 		if err != nil {
 			return nil, err
 		}
@@ -65,6 +36,79 @@ func parseMultipleFiles(paths []string) (map[string]any, error) {
 	}
 
 	return data, nil
+}
+
+func parseFile(path string) (map[string]any, error) {
+	var data map[string]any
+	var err error
+
+	switch ext := strings.ToLower(filepath.Ext(path)); ext {
+	case ".yaml", ".yml":
+		err = parseYAML(path, &data)
+	case ".json":
+		err = parseJSON(path, &data)
+	case ".toml":
+		err = parseTOML(path, &data)
+	case ".env":
+		err = parseENV(path)
+	default:
+		return nil, fmt.Errorf("confy doesn`t support '%s' files", ext)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
+}
+
+func parseYAML(path string, to *map[string]any) error {
+	f, err := os.OpenFile(path, os.O_RDONLY, 0)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	b, err := io.ReadAll(f)
+	if err != nil {
+		return err
+	}
+
+	return yaml.Unmarshal(b, to)
+}
+
+func parseJSON(path string, to *map[string]any) error {
+	f, err := os.OpenFile(path, os.O_RDONLY, 0)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	b, err := io.ReadAll(f)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(b, to)
+}
+
+func parseTOML(path string, to *map[string]any) error {
+	f, err := os.OpenFile(path, os.O_RDONLY, 0)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	b, err := io.ReadAll(f)
+	if err != nil {
+		return err
+	}
+
+	return toml.Unmarshal(b, to)
+}
+
+func parseENV(path string) error {
+	return godotenv.Load(path)
 }
 
 func mergeMaps(dst, src map[string]any) (map[string]any, error) {
@@ -92,14 +136,38 @@ func mergeMaps(dst, src map[string]any) (map[string]any, error) {
 	return dst, nil
 }
 
-func parseYAML(b []byte, data *map[string]any) error {
-	return yaml.Unmarshal(b, data)
+func getValidFiles(path string) ([]string, error) {
+	paths := make([]string, 0)
+
+	err := filepath.Walk(path, func(path string, info fs.FileInfo, err error) error {
+		if !info.IsDir() {
+			ext := strings.ToLower(filepath.Ext(path))
+
+			if slices.Contains(validExtensions, ext) {
+				paths = append(paths, path)
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return paths, nil
 }
 
-func parseJSON(b []byte, data *map[string]any) error {
-	return json.Unmarshal(b, data)
-}
+func getAllPaths(path string) ([]string, error) {
+	paths := make([]string, 0)
 
-func parseTOML(b []byte, data *map[string]any) error {
-	return toml.Unmarshal(b, data)
+	err := filepath.Walk(path, func(path string, info fs.FileInfo, err error) error {
+		paths = append(paths, path)
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return paths, nil
 }
