@@ -16,7 +16,7 @@ func processStruct(out reflect.Value, fileData map[string]any, fileTag string) e
 
 		value := getFieldValue(fieldType, fileData, fileTag)
 
-		err := setFieldValue(field, value)
+		err := setFieldValue(field, value, fileTag)
 		if err != nil {
 			return err
 		}
