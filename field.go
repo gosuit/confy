@@ -28,9 +28,7 @@ const (
 	validateTag = "validate"
 
 	// Default values
-	defaultRootPath   = "config"
-	defaultEnvVarName = "ENVIRONMENT"
-	defaultSeparator  = ";"
+	//defaultSeparator  = ";"
 )
 
 func setFieldValue(field reflect.Value, value any, fileTag string) error {
