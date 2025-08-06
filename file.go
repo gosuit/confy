@@ -20,6 +20,63 @@ var (
 	validExtensions = []string{".yaml", ".yml", ".json", ".toml", ".env"}
 )
 
+func getFileData(path string) (map[string]any, string, error) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return nil, "", err
+	}
+
+	if fi.IsDir() {
+		paths, err := getValidFiles(path)
+		if err != nil {
+			return nil, "", err
+		}
+
+		fileData, err := parseMultipleFiles(paths)
+		if err != nil {
+			return nil, "", err
+		}
+
+		return fileData, getFileTag(path), nil
+	} else {
+		fileData, err := parseFile(path)
+		if err != nil {
+			return nil, "", err
+		}
+
+		return fileData, getFileTag(path), nil
+	}
+}
+
+func getMultipleFilesData(paths []string) (map[string]any, string, error) {
+	files := make([]string, 0)
+
+	for _, path := range paths {
+		fi, err := os.Stat(path)
+		if err != nil {
+			return nil, "", err
+		}
+
+		if fi.IsDir() {
+			newFiles, err := getValidFiles(path)
+			if err != nil {
+				return nil, "", err
+			}
+
+			files = append(files, newFiles...)
+		} else {
+			files = append(files, path)
+		}
+	}
+
+	fileData, err := parseMultipleFiles(files)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return fileData, getMultipleFilesTag(files), nil
+}
+
 func parseMultipleFiles(paths []string) (map[string]any, error) {
 	data := make(map[string]any)
 
@@ -170,4 +227,35 @@ func getAllPaths(path string) ([]string, error) {
 	}
 
 	return paths, nil
+}
+
+func getFileTag(path string) string {
+	switch ext := strings.ToLower(filepath.Ext(path)); ext {
+	case ".yaml", ".yml":
+		return yamlTag
+	case ".json":
+		return jsonTag
+	case ".toml":
+		return tomlTag
+	default:
+		return confyTag
+	}
+}
+
+func getMultipleFilesTag(paths []string) string {
+	exts := make([]string, 0)
+
+	for _, path := range paths {
+		ext := strings.ToLower(filepath.Ext(path))
+
+		if !slices.Contains(exts, ext) {
+			exts = append(exts, ext)
+		}
+	}
+
+	if len(exts) > 1 {
+		return confyTag
+	}
+
+	return getFileTag(exts[0])
 }
