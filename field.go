@@ -2,6 +2,7 @@ package confy
 
 import (
 	"errors"
+	"net/url"
 	"os"
 	"reflect"
 	"strconv"
@@ -32,7 +33,56 @@ const (
 	//defaultSeparator  = ";"
 )
 
-func setFieldValue(field reflect.Value, value any, fileTag string) error {
+func setFieldValue(field reflect.Value, fieldType reflect.StructField, value any, fileTag string) error {
+	switch field.Type() {
+
+	case reflect.TypeOf(time.Time{}):
+		var layout string
+
+		layout, ok := fieldType.Tag.Lookup(layoutTag)
+		if !ok {
+			layout, ok = fieldType.Tag.Lookup(envLayoutTag)
+			if !ok {
+				layout = time.RFC3339
+			}
+		}
+
+		if stringValue, ok := value.(string); ok {
+			timeValue, err := time.Parse(layout, stringValue)
+			if err != nil {
+				return err
+			}
+
+			field.Set(reflect.ValueOf(timeValue))
+		} else {
+			return errors.New("value for time.Time must be string")
+		}
+
+	case reflect.TypeOf(url.URL{}):
+		if stringValue, ok := value.(string); ok {
+			urlValue, err := url.Parse(stringValue)
+			if err != nil {
+				return err
+			}
+
+			field.Set(reflect.ValueOf(*urlValue))
+		} else {
+			return errors.New("value for url.URL must be string")
+		}
+
+	case reflect.TypeOf(time.Location{}):
+		if stringValue, ok := value.(string); ok {
+			locationValue, err := time.LoadLocation(stringValue)
+			if err != nil {
+				return err
+			}
+
+			field.Set(reflect.ValueOf(*locationValue))
+		} else {
+			return errors.New("value for url.URL must be string")
+		}
+	}
+
 	switch field.Kind() {
 
 	case reflect.Interface:
@@ -49,7 +99,7 @@ func setFieldValue(field reflect.Value, value any, fileTag string) error {
 			for k, v := range mapValue {
 				newValue := reflect.New(field.Type().Elem()).Elem()
 
-				if err := setFieldValue(newValue, v, fileTag); err != nil {
+				if err := setFieldValue(newValue, fieldType, v, fileTag); err != nil {
 					return err
 				}
 
@@ -72,7 +122,7 @@ func setFieldValue(field reflect.Value, value any, fileTag string) error {
 			for i := range arrayValue {
 				newValue := reflect.New(field.Type().Elem()).Elem()
 
-				if err := setFieldValue(newValue, arrayValue[i], fileTag); err != nil {
+				if err := setFieldValue(newValue, fieldType, arrayValue[i], fileTag); err != nil {
 					return err
 				}
 
@@ -87,7 +137,7 @@ func setFieldValue(field reflect.Value, value any, fileTag string) error {
 			for i := range sliceValue {
 				newValue := reflect.New(field.Type().Elem()).Elem()
 
-				if err := setFieldValue(newValue, sliceValue[i], fileTag); err != nil {
+				if err := setFieldValue(newValue, fieldType, sliceValue[i], fileTag); err != nil {
 					return err
 				}
 
@@ -109,7 +159,7 @@ func setFieldValue(field reflect.Value, value any, fileTag string) error {
 	case reflect.Ptr:
 		newField := reflect.New(field.Type().Elem()).Elem()
 
-		if err := setFieldValue(newField, value, fileTag); err != nil {
+		if err := setFieldValue(newField, fieldType, value, fileTag); err != nil {
 			return err
 		}
 
