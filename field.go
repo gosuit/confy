@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -124,12 +125,30 @@ func setFieldValue(field reflect.Value, value any, fileTag string) error {
 	case reflect.Bool:
 		if boolValue, ok := value.(bool); ok {
 			field.SetBool(boolValue)
+		} else if stringValue, ok := value.(string); ok {
+			boolValue, err := strconv.ParseBool(stringValue)
+			if err != nil {
+				return err
+			}
+
+			field.SetBool(boolValue)
 		} else {
 			return errors.New("value for bool must be bool")
 		}
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32:
 		if intValue, ok := value.(int); ok {
+			if !field.OverflowInt(int64(intValue)) {
+				field.SetInt(int64(intValue))
+			} else {
+				return errors.New("value for int is overflowed")
+			}
+		} else if stringValue, ok := value.(string); ok {
+			intValue, err := strconv.ParseInt(stringValue, 10, 64)
+			if err != nil {
+				return err
+			}
+
 			if !field.OverflowInt(int64(intValue)) {
 				field.SetInt(int64(intValue))
 			} else {
@@ -147,6 +166,17 @@ func setFieldValue(field reflect.Value, value any, fileTag string) error {
 				return err
 			}
 			field.SetInt(int64(d))
+		} else if ok {
+			intValue, err := strconv.ParseInt(stringValue, 10, 64)
+			if err != nil {
+				return err
+			}
+
+			if !field.OverflowInt(int64(intValue)) {
+				field.SetInt(int64(intValue))
+			} else {
+				return errors.New("value for int is overflowed")
+			}
 		} else if intValue, ok := value.(int); ok {
 			if !field.OverflowInt(int64(intValue)) {
 				field.SetInt(int64(intValue))
@@ -164,12 +194,34 @@ func setFieldValue(field reflect.Value, value any, fileTag string) error {
 			} else {
 				return errors.New("value for uint is overflowed")
 			}
+		} else if stringValue, ok := value.(string); ok {
+			uintValue, err := strconv.ParseUint(stringValue, 10, 64)
+			if err != nil {
+				return err
+			}
+
+			if !field.OverflowUint(uint64(uintValue)) {
+				field.SetUint(uint64(uintValue))
+			} else {
+				return errors.New("value for uint is overflowed")
+			}
 		} else {
 			return errors.New("value for uint must be uint")
 		}
 
 	case reflect.Float32, reflect.Float64:
 		if floatValue, ok := value.(float64); ok {
+			if !field.OverflowFloat(floatValue) {
+				field.SetFloat(floatValue)
+			} else {
+				return errors.New("value for float is overflowed")
+			}
+		} else if stringValue, ok := value.(string); ok {
+			floatValue, err := strconv.ParseFloat(stringValue, 64)
+			if err != nil {
+				return err
+			}
+
 			if !field.OverflowFloat(floatValue) {
 				field.SetFloat(floatValue)
 			} else {
