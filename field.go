@@ -79,7 +79,7 @@ func setFieldValue(field reflect.Value, fieldType reflect.StructField, value any
 
 			field.Set(reflect.ValueOf(*locationValue))
 		} else {
-			return errors.New("value for url.URL must be string")
+			return errors.New("value for time.Location must be string")
 		}
 	}
 
@@ -289,7 +289,7 @@ func setFieldValue(field reflect.Value, fieldType reflect.StructField, value any
 	return nil
 }
 
-func getFieldValue(fieldType reflect.StructField, fileData map[string]any, fileTag string) any {
+func getFieldValue(field reflect.Value, fieldType reflect.StructField, fileData map[string]any, fileTag string) (any, error) {
 	value, fileOk := getFieldFileValue(fieldType, fileData, fileTag)
 
 	value, envOk := overrideValueWithEnv(value, fieldType)
@@ -298,7 +298,12 @@ func getFieldValue(fieldType reflect.StructField, fileData map[string]any, fileT
 		value = getFieldDefaultValue(fieldType)
 	}
 
-	return value
+	value, err := parseValueForType(field, fieldType, value)
+	if err != nil {
+		return nil, err
+	}
+
+	return value, nil
 }
 
 func getFieldFileValue(fieldType reflect.StructField, fileData map[string]any, fileTag string) (any, bool) {
@@ -364,4 +369,229 @@ func getFieldDefaultValue(fieldType reflect.StructField) any {
 	}
 
 	return value
+}
+
+// TODO: add separation between env and not anv values.
+func parseValueForType(field reflect.Value, fieldType reflect.StructField, value any) (any, error) {
+
+	switch field.Type() {
+
+	case reflect.TypeOf(time.Time{}):
+		var layout string
+
+		layout, ok := fieldType.Tag.Lookup(layoutTag)
+		if !ok {
+			layout, ok = fieldType.Tag.Lookup(envLayoutTag)
+			if !ok {
+				layout = time.RFC3339
+			}
+		}
+
+		if stringValue, ok := value.(string); ok {
+			return time.Parse(layout, stringValue)
+		} else {
+			return nil, errors.New("value for time.Time must be string")
+		}
+
+	case reflect.TypeOf(url.URL{}):
+		if stringValue, ok := value.(string); ok {
+			urlValue, err := url.Parse(stringValue)
+			if err != nil {
+				return nil, err
+			}
+
+			return *urlValue, nil
+		} else {
+			return nil, errors.New("value for url.URL must be string")
+		}
+
+	case reflect.TypeOf(time.Location{}):
+		if stringValue, ok := value.(string); ok {
+			locationValue, err := time.LoadLocation(stringValue)
+			if err != nil {
+				return nil, err
+			}
+
+			return *locationValue, nil
+		} else {
+			return nil, errors.New("value for time.Location must be string")
+		}
+
+	}
+
+	switch field.Kind() {
+
+	case reflect.Interface:
+		return value, nil
+
+	case reflect.Map:
+		if mapValue, ok := value.(map[string]any); ok {
+			return mapValue, nil
+		} else if stringValue, ok := value.(string); ok {
+			return parseMap(stringValue)
+		} else {
+			return nil, errors.New("value for map must be map")
+		}
+
+	case reflect.Array:
+		if arrayValue, ok := value.([]any); ok {
+			return arrayValue, nil
+		} else if stringValue, ok := value.(string); ok {
+			return parseArray(stringValue)
+		} else {
+			return nil, errors.New("value for array must be array")
+		}
+
+	case reflect.Slice:
+		if sliceValue, ok := value.([]any); ok {
+			return sliceValue, nil
+		} else if stringValue, ok := value.(string); ok {
+			return parseArray(stringValue)
+		} else {
+			return nil, errors.New("value for slice must be slice")
+		}
+
+	case reflect.Struct:
+		if mapValue, ok := value.(map[string]any); ok {
+			return mapValue, nil
+		} else if stringValue, ok := value.(string); ok {
+			return parseMap(stringValue)
+		} else {
+			return nil, errors.New("value for struct must be struct")
+		}
+
+	case reflect.Ptr:
+		newField := reflect.New(field.Type().Elem()).Elem()
+
+		return parseValueForType(newField, fieldType, value)
+
+	case reflect.String:
+		if stringValue, ok := value.(string); ok {
+			return stringValue, nil
+		} else {
+			return nil, errors.New("value for string must be string")
+		}
+
+	case reflect.Bool:
+		if boolValue, ok := value.(bool); ok {
+			return boolValue, nil
+		} else if stringValue, ok := value.(string); ok {
+			boolValue, err := strconv.ParseBool(stringValue)
+			if err != nil {
+				return nil, err
+			}
+
+			return boolValue, nil
+		} else {
+			return nil, errors.New("value for bool must be bool")
+		}
+
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32:
+		if intValue, ok := value.(int); ok {
+			if !field.OverflowInt(int64(intValue)) {
+				return intValue, nil
+			} else {
+				return nil, errors.New("value for int is overflowed")
+			}
+		} else if stringValue, ok := value.(string); ok {
+			intValue, err := strconv.ParseInt(stringValue, 10, 64)
+			if err != nil {
+				return nil, err
+			}
+
+			if !field.OverflowInt(int64(intValue)) {
+				return intValue, nil
+			} else {
+				return nil, errors.New("value for int is overflowed")
+			}
+		} else {
+			return nil, errors.New("value for int must be int")
+		}
+
+	case reflect.Int64:
+		stringValue, ok := value.(string)
+		if field.Type() == reflect.TypeOf(time.Duration(0)) && ok {
+			d, err := time.ParseDuration(stringValue)
+			if err != nil {
+				return nil, err
+			}
+
+			return d, nil
+		} else if ok {
+			intValue, err := strconv.ParseInt(stringValue, 10, 64)
+			if err != nil {
+				return nil, err
+			}
+
+			if !field.OverflowInt(int64(intValue)) {
+				return intValue, nil
+			} else {
+				return nil, errors.New("value for int is overflowed")
+			}
+		} else if intValue, ok := value.(int); ok {
+			if !field.OverflowInt(int64(intValue)) {
+				return intValue, nil
+			} else {
+				return nil, errors.New("value for int is overflowed")
+			}
+		} else {
+			return nil, errors.New("value for int must be int")
+		}
+
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		if uintValue, ok := value.(int); ok {
+			if !field.OverflowUint(uint64(uintValue)) {
+				return uintValue, nil
+			} else {
+				return nil, errors.New("value for uint is overflowed")
+			}
+		} else if stringValue, ok := value.(string); ok {
+			uintValue, err := strconv.ParseUint(stringValue, 10, 64)
+			if err != nil {
+				return nil, err
+			}
+
+			if !field.OverflowUint(uint64(uintValue)) {
+				return uintValue, nil
+			} else {
+				return nil, errors.New("value for uint is overflowed")
+			}
+		} else {
+			return nil, errors.New("value for uint must be uint")
+		}
+
+	case reflect.Float32, reflect.Float64:
+		if floatValue, ok := value.(float64); ok {
+			if !field.OverflowFloat(floatValue) {
+				return floatValue, nil
+			} else {
+				return nil, errors.New("value for float is overflowed")
+			}
+		} else if stringValue, ok := value.(string); ok {
+			floatValue, err := strconv.ParseFloat(stringValue, 64)
+			if err != nil {
+				return nil, err
+			}
+
+			if !field.OverflowFloat(floatValue) {
+				return floatValue, nil
+			} else {
+				return nil, errors.New("value for float is overflowed")
+			}
+		} else {
+			return nil, errors.New("value for float must be float")
+		}
+
+	default:
+		return nil, errors.New("unsupported value type")
+
+	}
+}
+
+func parseMap(value string) (map[string]any, error) {
+	return nil, nil
+}
+
+func parseArray(value string) ([]any, error) {
+	return nil, nil
 }
