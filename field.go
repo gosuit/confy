@@ -30,7 +30,7 @@ const (
 	validateTag = "validate"
 
 	// Default values
-	//defaultSeparator  = ";"
+	defaultSeparator = ";"
 )
 
 func setFieldValue(field reflect.Value, fieldType reflect.StructField, value any, fileTag string) error {
@@ -428,7 +428,7 @@ func parseValueForType(field reflect.Value, fieldType reflect.StructField, value
 		if mapValue, ok := value.(map[string]any); ok {
 			return mapValue, nil
 		} else if stringValue, ok := value.(string); ok {
-			return parseMap(stringValue)
+			return parseMap(field, fieldType, stringValue)
 		} else {
 			return nil, errors.New("value for map must be map")
 		}
@@ -437,7 +437,7 @@ func parseValueForType(field reflect.Value, fieldType reflect.StructField, value
 		if arrayValue, ok := value.([]any); ok {
 			return arrayValue, nil
 		} else if stringValue, ok := value.(string); ok {
-			return parseArray(stringValue)
+			return parseArray(field, fieldType, stringValue)
 		} else {
 			return nil, errors.New("value for array must be array")
 		}
@@ -446,7 +446,7 @@ func parseValueForType(field reflect.Value, fieldType reflect.StructField, value
 		if sliceValue, ok := value.([]any); ok {
 			return sliceValue, nil
 		} else if stringValue, ok := value.(string); ok {
-			return parseArray(stringValue)
+			return parseArray(field, fieldType, stringValue)
 		} else {
 			return nil, errors.New("value for slice must be slice")
 		}
@@ -455,7 +455,7 @@ func parseValueForType(field reflect.Value, fieldType reflect.StructField, value
 		if mapValue, ok := value.(map[string]any); ok {
 			return mapValue, nil
 		} else if stringValue, ok := value.(string); ok {
-			return parseMap(stringValue)
+			return parseMap(field, fieldType, stringValue)
 		} else {
 			return nil, errors.New("value for struct must be struct")
 		}
@@ -588,10 +588,60 @@ func parseValueForType(field reflect.Value, fieldType reflect.StructField, value
 	}
 }
 
-func parseMap(value string) (map[string]any, error) {
-	return nil, nil
+func parseMap(field reflect.Value, fieldType reflect.StructField, value string) (map[any]any, error) {
+	separator, ok := fieldType.Tag.Lookup(envSeparatorTag)
+	if !ok {
+		separator = defaultSeparator
+	}
+
+	items := strings.Split(value, separator)
+	resultMap := make(map[any]any)
+
+	for _, item := range items {
+		pair := strings.SplitN(item, ":", 2)[0]
+
+		if len(pair) != 2 {
+			return nil, errors.New("invalid item in map")
+		}
+
+		keyValue := reflect.New(field.Type().Key())
+
+		key, err := parseValueForType(keyValue, fieldType, pair[0])
+		if err != nil {
+			return nil, err
+		}
+
+		valueValue := reflect.New(field.Type().Elem())
+
+		val, err := parseValueForType(valueValue, fieldType, pair[1])
+		if err != nil {
+			return nil, err
+		}
+
+		resultMap[key] = val
+	}
+	return resultMap, nil
 }
 
-func parseArray(value string) ([]any, error) {
-	return nil, nil
+func parseArray(field reflect.Value, fieldType reflect.StructField, value string) ([]any, error) {
+	separator, ok := fieldType.Tag.Lookup(envSeparatorTag)
+	if !ok {
+		separator = defaultSeparator
+	}
+
+	stringArray := strings.Split(value, separator)
+	resultArray := make([]any, 0)
+
+	for _, stringValue := range stringArray {
+		valueType := reflect.New(field.Type().Elem())
+
+		newValue, err := parseValueForType(valueType, fieldType, stringValue)
+		if err != nil {
+			return nil, err
+		}
+
+		resultArray = append(resultArray, newValue)
+	}
+
+	return resultArray, nil
 }
