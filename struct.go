@@ -45,13 +45,14 @@ func fillConfig(cfg any, data map[string]any, dataTag string) error {
 
 	metadata := make(map[string]string)
 	metadata["dataTag"] = dataTag
+	metadata["name"] = out.Type().Name()
 
 	return processStruct(out, data, metadata)
 }
 
 func processStruct(s reflect.Value, data map[string]any, metadata map[string]string) error {
 	if s.Kind() != reflect.Struct {
-		return errors.New("internal error")
+		return fmt.Errorf("internal error: field '%s' is not a struct, but it is passed as an argument to the processStruct function", metadata["name"])
 	}
 
 	for i := range s.NumField() {
@@ -68,6 +69,10 @@ func processStruct(s reflect.Value, data map[string]any, metadata map[string]str
 }
 
 func processField(f reflect.Value, data map[string]any, metadata map[string]string) error {
+	if !f.CanSet() {
+		return nil
+	}
+
 	if f.Kind() == reflect.Pointer {
 		newValue := reflect.New(f.Type().Elem()).Elem()
 
@@ -95,7 +100,7 @@ func processField(f reflect.Value, data map[string]any, metadata map[string]stri
 	}
 
 	if value.Type() != f.Type() {
-		return errors.New("internal error")
+		return fmt.Errorf("internal error: type of the value from the getFieldValue function differs from the type of the '%s' field", metadata["name"])
 	}
 
 	f.Set(value)
