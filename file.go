@@ -2,7 +2,6 @@ package confy
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -23,7 +22,7 @@ var (
 func getFileData(path string) (map[string]any, string, error) {
 	fi, err := os.Stat(path)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("error while '%s' path read: %s", path, err.Error())
 	}
 
 	if fi.IsDir() {
@@ -54,7 +53,7 @@ func getMultipleFilesData(paths []string) (map[string]any, string, error) {
 	for _, path := range paths {
 		fi, err := os.Stat(path)
 		if err != nil {
-			return nil, "", err
+			return nil, "", fmt.Errorf("error while '%s' path read: %s", path, err.Error())
 		}
 
 		if fi.IsDir() {
@@ -95,7 +94,7 @@ func parseFile(path string) (map[string]any, error) {
 	}
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error while '%s' file parsing: %s", path, err.Error())
 	}
 
 	return data, nil
@@ -104,16 +103,24 @@ func parseFile(path string) (map[string]any, error) {
 func parseMultipleFiles(paths []string) (map[string]any, error) {
 	data := make(map[string]any)
 
+	var previous string
+
+	if len(paths) > 0 {
+		previous = paths[0]
+	}
+
 	for _, path := range paths {
 		newData, err := parseFile(path)
 		if err != nil {
 			return nil, err
 		}
 
-		data, err = mergeMaps(data, newData)
+		data, err = mergeMaps(data, newData, previous, path, "")
 		if err != nil {
 			return nil, err
 		}
+
+		previous = path
 	}
 
 	return data, nil
@@ -168,22 +175,28 @@ func parseENV(path string) error {
 	return godotenv.Load(path)
 }
 
-func mergeMaps(dst, src map[string]any) (map[string]any, error) {
+func mergeMaps(dst, src map[string]any, dstPath, srcPath, commonKey string) (map[string]any, error) {
 	for key, val := range src {
 		if dstVal, ok := dst[key]; ok {
+			if commonKey == "" {
+				commonKey = key
+			} else {
+				commonKey += "." + key
+			}
+
 			if dstValMap, ok := dstVal.(map[string]any); ok {
 				if valMap, ok := val.(map[string]any); ok {
-					newVal, err := mergeMaps(dstValMap, valMap)
+					newVal, err := mergeMaps(dstValMap, valMap, dstPath, srcPath, commonKey)
 					if err != nil {
 						return nil, err
 					}
 
 					dst[key] = newVal
 				} else {
-					return nil, errors.New("value conflict in different sources")
+					return nil, fmt.Errorf("conflict while files read: it is impossible to unambiguously determine the value for the '%s' key specified in the '%s' file and in the '%s' file", commonKey, dstPath, srcPath)
 				}
 			} else {
-				return nil, errors.New("value conflict in different sources")
+				return nil, fmt.Errorf("conflict while files read: it is impossible to unambiguously determine the value for the '%s' key specified in the '%s' file and in the '%s' file", commonKey, dstPath, srcPath)
 			}
 		} else {
 			dst[key] = val
@@ -208,7 +221,7 @@ func getValidFiles(path string) ([]string, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error while '%s' directory read: %s", path, err.Error())
 	}
 
 	return paths, nil
@@ -223,7 +236,7 @@ func getAllPaths(path string) ([]string, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error while '%s' directory read: %s", path, err.Error())
 	}
 
 	return paths, nil
