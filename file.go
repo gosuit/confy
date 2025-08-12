@@ -37,7 +37,7 @@ func getFileData(path string) (map[string]any, string, error) {
 			return nil, "", err
 		}
 
-		return fileData, getFileTag(path), nil
+		return fileData, getMultipleFilesTag(paths), nil
 	} else {
 		fileData, err := parseFile(path)
 		if err != nil {
@@ -77,24 +77,6 @@ func getMultipleFilesData(paths []string) (map[string]any, string, error) {
 	return fileData, getMultipleFilesTag(files), nil
 }
 
-func parseMultipleFiles(paths []string) (map[string]any, error) {
-	data := make(map[string]any)
-
-	for _, path := range paths {
-		newData, err := parseFile(path)
-		if err != nil {
-			return nil, err
-		}
-
-		data, err = mergeMaps(data, newData)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return data, nil
-}
-
 func parseFile(path string) (map[string]any, error) {
 	var data map[string]any
 	var err error
@@ -114,6 +96,24 @@ func parseFile(path string) (map[string]any, error) {
 
 	if err != nil {
 		return nil, err
+	}
+
+	return data, nil
+}
+
+func parseMultipleFiles(paths []string) (map[string]any, error) {
+	data := make(map[string]any)
+
+	for _, path := range paths {
+		newData, err := parseFile(path)
+		if err != nil {
+			return nil, err
+		}
+
+		data, err = mergeMaps(data, newData)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return data, nil

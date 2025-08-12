@@ -2,6 +2,7 @@ package confy
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 )
@@ -29,17 +30,17 @@ const (
 	defaultSeparator = ";"
 )
 
-func fillConfig(s any, data map[string]any, dataTag string) error {
-	out := reflect.ValueOf(s)
+func fillConfig(cfg any, data map[string]any, dataTag string) error {
+	out := reflect.ValueOf(cfg)
 
 	if out.Kind() == reflect.Pointer && !out.IsNil() {
 		out = out.Elem()
 	} else {
-		return errors.New("config struct must be pointer and not nil")
+		return errors.New("the 'to' argument must be a non-nil pointer to struct")
 	}
 
 	if out.Kind() != reflect.Struct {
-		return errors.New("config must be struct")
+		return errors.New("the passed pointer does not point to the struct")
 	}
 
 	metadata := make(map[string]string)
@@ -93,6 +94,10 @@ func processField(f reflect.Value, data map[string]any, metadata map[string]stri
 		return err
 	}
 
+	if value.Type() != f.Type() {
+		return errors.New("internal error")
+	}
+
 	f.Set(value)
 
 	return nil
@@ -101,48 +106,53 @@ func processField(f reflect.Value, data map[string]any, metadata map[string]stri
 func getFieldMetadata(fieldStructType reflect.StructField, commonMetadata map[string]string) map[string]string {
 	metadata := make(map[string]string)
 
+	// Set required metadata
+	metadata["key"] = getMetadataKey(fieldStructType, commonMetadata)
+	metadata["name"] = getMetadataName(fieldStructType, commonMetadata)
+	metadata["required"] = getMetadataRequired(fieldStructType)
+	metadata["separator"] = getMetadataSeparator(fieldStructType)
+
+	// Set non-required metadata
+	env, ok := getMetadataEnv(fieldStructType)
+	if ok {
+		metadata["env"] = env
+	}
+
+	defaultValue, ok := getMetadataDefaultValue(fieldStructType)
+	if ok {
+		metadata["defaultValue"] = defaultValue
+	}
+
+	layout, ok := getMetadataLayout(fieldStructType)
+	if ok {
+		metadata["layout"] = layout
+	}
+
+	return metadata
+}
+
+func getMetadataKey(fieldStructType reflect.StructField, metadata map[string]string) string {
 	key, ok := fieldStructType.Tag.Lookup(confyTag)
 	if !ok {
-		key, ok = fieldStructType.Tag.Lookup(commonMetadata["dataTag"])
+		key, ok = fieldStructType.Tag.Lookup(metadata["dataTag"])
 		if !ok {
 			key = strings.ToLower(fieldStructType.Name)
 		}
 	}
 
-	metadata["key"] = key
+	return key
+}
 
-	defaultValue, ok := fieldStructType.Tag.Lookup(defaultTag)
-	if !ok {
-		defaultValue, ok = fieldStructType.Tag.Lookup(envDefaultTag)
-		if ok {
-			metadata["defaultValue"] = defaultValue
-		}
-	} else {
-		metadata["defaultValue"] = defaultValue
-	}
-
-	env, ok := fieldStructType.Tag.Lookup(envTag)
+func getMetadataName(fieldStructType reflect.StructField, metadata map[string]string) string {
+	name, ok := metadata["name"]
 	if ok {
-		metadata["env"] = env
+		return fmt.Sprintf("%s.%s", name, fieldStructType.Name)
 	}
 
-	layout, ok := fieldStructType.Tag.Lookup(layoutTag)
-	if !ok {
-		layout, ok = fieldStructType.Tag.Lookup(envLayoutTag)
-		if ok {
-			metadata["layout"] = layout
-		}
-	} else {
-		metadata["layout"] = layout
-	}
+	return fieldStructType.Name
+}
 
-	separator, ok := fieldStructType.Tag.Lookup(envSeparatorTag)
-	if !ok {
-		separator = defaultSeparator
-	}
-
-	metadata["separator"] = separator
-
+func getMetadataRequired(fieldStructType reflect.StructField) string {
 	required, ok := fieldStructType.Tag.Lookup(requiredTag)
 	if !ok {
 		required, ok = fieldStructType.Tag.Lookup(envRequiredTag)
@@ -151,9 +161,41 @@ func getFieldMetadata(fieldStructType reflect.StructField, commonMetadata map[st
 		}
 	}
 
-	metadata["required"] = required
+	return required
+}
 
-	metadata["name"] = fieldStructType.Name
+func getMetadataSeparator(fieldStructType reflect.StructField) string {
+	separator, ok := fieldStructType.Tag.Lookup(envSeparatorTag)
+	if !ok {
+		separator = defaultSeparator
+	}
 
-	return nil
+	return separator
+}
+
+func getMetadataEnv(fieldStructType reflect.StructField) (string, bool) {
+	return fieldStructType.Tag.Lookup(envTag)
+}
+
+func getMetadataDefaultValue(fieldStructType reflect.StructField) (string, bool) {
+	defaultValue, ok := fieldStructType.Tag.Lookup(defaultTag)
+	if !ok {
+		defaultValue, ok = fieldStructType.Tag.Lookup(envDefaultTag)
+		if ok {
+			return defaultValue, true
+		}
+	} else {
+		return defaultValue, true
+	}
+
+	return "", false
+}
+
+func getMetadataLayout(fieldStructType reflect.StructField) (string, bool) {
+	layout, ok := fieldStructType.Tag.Lookup(layoutTag)
+	if !ok {
+		return fieldStructType.Tag.Lookup(envLayoutTag)
+	} else {
+		return layout, true
+	}
 }
