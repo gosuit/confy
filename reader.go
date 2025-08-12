@@ -7,6 +7,8 @@ import (
 	"slices"
 )
 
+// TODO: refactor this
+
 const (
 	defaultRootPath   = "config"
 	defaultEnvVarName = "ENVIRONMENT"

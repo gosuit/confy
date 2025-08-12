@@ -6,12 +6,7 @@ func Read(to any, from string) error {
 		return err
 	}
 
-	out, err := prepareStruct(to)
-	if err != nil {
-		return err
-	}
-
-	err = processStruct(out, fileData, fileTag)
+	err = fillConfig(to, fileData, fileTag)
 	if err != nil {
 		return err
 	}
@@ -25,12 +20,7 @@ func ReadMany(to any, from ...string) error {
 		return err
 	}
 
-	out, err := prepareStruct(to)
-	if err != nil {
-		return err
-	}
-
-	err = processStruct(out, fileData, fileTag)
+	err = fillConfig(to, fileData, fileTag)
 	if err != nil {
 		return err
 	}
@@ -41,12 +31,7 @@ func ReadMany(to any, from ...string) error {
 func ReadEnv(to any) error {
 	fileData := make(map[string]any)
 
-	out, err := prepareStruct(to)
-	if err != nil {
-		return err
-	}
-
-	err = processStruct(out, fileData, confyTag)
+	err := fillConfig(to, fileData, confyTag)
 	if err != nil {
 		return err
 	}
