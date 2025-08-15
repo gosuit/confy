@@ -9,33 +9,35 @@ import (
 	"time"
 )
 
-func parseValue(f reflect.Value, value any, metadata map[string]string) (reflect.Value, error) {
+func parseValue(f reflect.Value, value any, metadata map[string]string) error {
 
 	switch f.Type() {
 
 	case reflect.TypeOf(time.Time{}):
-		return parseTimeTime(value, metadata)
+		return parseTime(f, value, metadata)
 
 	case reflect.TypeOf(url.URL{}):
-		return parseUrlUrl(value, metadata)
+		return parseUrl(f, value, metadata)
 
 	case reflect.TypeOf(time.Location{}):
-		return parseTimeLocation(value, metadata)
+		return parseTimeLocation(f, value, metadata)
 
 	case reflect.TypeOf(time.Duration(0)):
-		return parseTimeDuration(value, metadata)
+		return parseTimeDuration(f, value, metadata)
 	}
 
 	switch f.Kind() {
 
 	case reflect.Interface:
-		return reflect.ValueOf(value), nil
+		f.Set(reflect.ValueOf(value))
+
+		return nil
 
 	case reflect.String:
-		return parseString(value, metadata)
+		return parseString(f, value, metadata)
 
 	case reflect.Bool:
-		return parseBool(value, metadata)
+		return parseBool(f, value, metadata)
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return parseInt(f, value, metadata)
@@ -56,12 +58,12 @@ func parseValue(f reflect.Value, value any, metadata map[string]string) (reflect
 		return parseSlice(f, value, metadata)
 
 	default:
-		return reflect.Value{}, fmt.Errorf("error while value parsing: the '%v' type of the '%s' field is not supported", f.Type(), metadata["name"])
+		return fmt.Errorf("error while value parsing: the '%v' type of the '%s' field is not supported", f.Type(), metadata["name"])
 
 	}
 }
 
-func parseTimeTime(value any, metadata map[string]string) (reflect.Value, error) {
+func parseTime(f reflect.Value, value any, metadata map[string]string) error {
 	layout, ok := metadata["layout"]
 	if !ok {
 		layout = time.RFC3339
@@ -70,149 +72,167 @@ func parseTimeTime(value any, metadata map[string]string) (reflect.Value, error)
 	if stringValue, ok := value.(string); ok {
 		timeValue, err := time.Parse(layout, stringValue)
 		if err != nil {
-			return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be time.Time", metadata["name"])
+			return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be time.Time", metadata["name"])
 		}
 
-		return reflect.ValueOf(timeValue), nil
+		f.Set(reflect.ValueOf(timeValue))
 	} else {
-		return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be string", metadata["name"])
+		return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be string", metadata["name"])
 	}
+
+	return nil
 }
 
-func parseTimeLocation(value any, metadata map[string]string) (reflect.Value, error) {
+func parseTimeLocation(f reflect.Value, value any, metadata map[string]string) error {
 	if stringValue, ok := value.(string); ok {
 		locationValue, err := time.LoadLocation(stringValue)
 		if err != nil {
-			return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be time.Location", metadata["name"])
+			return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be time.Location", metadata["name"])
 		}
 
-		return reflect.ValueOf(*locationValue), nil
+		f.Set(reflect.ValueOf(*locationValue))
 	} else {
-		return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be string", metadata["name"])
+		return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be string", metadata["name"])
 	}
+
+	return nil
 }
 
-func parseTimeDuration(value any, metadata map[string]string) (reflect.Value, error) {
+func parseTimeDuration(f reflect.Value, value any, metadata map[string]string) error {
 	if stringValue, ok := value.(string); ok {
 		durationValue, err := time.ParseDuration(stringValue)
 		if err != nil {
-			return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be time.Duration", metadata["name"])
+			return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be time.Duration", metadata["name"])
 		}
 
-		return reflect.ValueOf(durationValue), nil
+		f.Set(reflect.ValueOf(durationValue))
 	} else {
-		return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be string", metadata["name"])
+		return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be string", metadata["name"])
 	}
+
+	return nil
 }
 
-func parseUrlUrl(value any, metadata map[string]string) (reflect.Value, error) {
+func parseUrl(f reflect.Value, value any, metadata map[string]string) error {
 	if stringValue, ok := value.(string); ok {
 		urlValue, err := url.Parse(stringValue)
 		if err != nil {
-			return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be URL", metadata["name"])
+			return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be URL", metadata["name"])
 		}
 
-		return reflect.ValueOf(*urlValue), nil
+		f.Set(reflect.ValueOf(*urlValue))
 	} else {
-		return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be string", metadata["name"])
+		return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be string", metadata["name"])
 	}
+
+	return nil
 }
 
-func parseString(value any, metadata map[string]string) (reflect.Value, error) {
+func parseString(f reflect.Value, value any, metadata map[string]string) error {
 	if stringValue, ok := value.(string); ok {
-		return reflect.ValueOf(stringValue), nil
+		f.SetString(stringValue)
 	} else {
-		return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be string", metadata["name"])
+		return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be string", metadata["name"])
 	}
+
+	return nil
 }
 
-func parseBool(value any, metadata map[string]string) (reflect.Value, error) {
+func parseBool(f reflect.Value, value any, metadata map[string]string) error {
 	if boolValue, ok := value.(bool); ok {
-		return reflect.ValueOf(boolValue), nil
+		f.SetBool(boolValue)
 	} else if stringValue, ok := value.(string); ok && metadata["isValueEnv"] == "true" {
 		boolValue, err := strconv.ParseBool(stringValue)
 		if err != nil {
-			return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be bool", metadata["name"])
+			return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be bool", metadata["name"])
 		}
 
-		return reflect.ValueOf(boolValue), nil
+		f.SetBool(boolValue)
 	} else {
-		return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be bool", metadata["name"])
+		return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be bool", metadata["name"])
 	}
+
+	return nil
 }
 
-func parseInt(f reflect.Value, value any, metadata map[string]string) (reflect.Value, error) {
+func parseInt(f reflect.Value, value any, metadata map[string]string) error {
 	if intValue, ok := value.(int); ok {
 		if !f.OverflowInt(int64(intValue)) {
-			return reflect.ValueOf(intValue), nil
+			f.SetInt(int64(intValue))
 		} else {
-			return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for '%s' field is overflowed", metadata["name"])
+			return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field is overflowed", metadata["name"])
 		}
 	} else if stringValue, ok := value.(string); ok && metadata["isValueEnv"] == "true" {
 		intValue, err := strconv.ParseInt(stringValue, 10, 64)
 		if err != nil {
-			return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be int", metadata["name"])
+			return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be int", metadata["name"])
 		}
 
 		if !f.OverflowInt(int64(intValue)) {
-			return reflect.ValueOf(intValue), nil
+			f.SetInt(int64(intValue))
 		} else {
-			return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for '%s' field is overflowed", metadata["name"])
+			return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field is overflowed", metadata["name"])
 		}
 	} else {
-		return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be int", metadata["name"])
+		return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be int", metadata["name"])
 	}
+
+	return nil
 }
 
-func parseUint(f reflect.Value, value any, metadata map[string]string) (reflect.Value, error) {
+func parseUint(f reflect.Value, value any, metadata map[string]string) error {
 	if uintValue, ok := value.(int); ok {
 		if !f.OverflowUint(uint64(uintValue)) {
-			return reflect.ValueOf(uintValue), nil
+			f.SetUint(uint64(uintValue))
 		} else {
-			return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for '%s' field is overflowed", metadata["name"])
+			return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field is overflowed", metadata["name"])
 		}
 	} else if stringValue, ok := value.(string); ok && metadata["isValueEnv"] == "true" {
 		uintValue, err := strconv.ParseUint(stringValue, 10, 64)
 		if err != nil {
-			return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be uint", metadata["name"])
+			return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be uint", metadata["name"])
 		}
 
 		if !f.OverflowUint(uint64(uintValue)) {
-			return reflect.ValueOf(uintValue), nil
+			f.SetUint(uint64(uintValue))
 		} else {
-			return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for '%s' field is overflowed", metadata["name"])
+			return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field is overflowed", metadata["name"])
 		}
 	} else {
-		return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be uint", metadata["name"])
+		return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be uint", metadata["name"])
 	}
+
+	return nil
 }
 
-func parseFloat(f reflect.Value, value any, metadata map[string]string) (reflect.Value, error) {
+func parseFloat(f reflect.Value, value any, metadata map[string]string) error {
 	if floatValue, ok := value.(float64); ok {
 		if !f.OverflowFloat(floatValue) {
-			return reflect.ValueOf(floatValue), nil
+			f.SetFloat(floatValue)
 		} else {
-			return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for '%s' field is overflowed", metadata["name"])
+			return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field is overflowed", metadata["name"])
 		}
 	} else if stringValue, ok := value.(string); ok && metadata["isValueEnv"] == "true" {
 		floatValue, err := strconv.ParseFloat(stringValue, 64)
 		if err != nil {
-			return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be float", metadata["name"])
+			return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be float", metadata["name"])
 		}
 
 		if !f.OverflowFloat(floatValue) {
-			return reflect.ValueOf(floatValue), nil
+			f.SetFloat(floatValue)
 		} else {
-			return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for '%s' field is overflowed", metadata["name"])
+			return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field is overflowed", metadata["name"])
 		}
 	} else {
-		return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be float", metadata["name"])
+		return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be float", metadata["name"])
 	}
+
+	return nil
 }
 
-func parseMap(f reflect.Value, value any, metadata map[string]string) (reflect.Value, error) {
+func parseMap(f reflect.Value, value any, metadata map[string]string) error {
 	if f.Type().Key().Kind() != reflect.String {
-		return reflect.Value{}, fmt.Errorf("error while value parsing: unsuppored type. type of '%s' field is a map with non-string key", metadata["name"])
+		return fmt.Errorf("error while value parsing: unsuppored type. type of '%s' field is a map with non-string key", metadata["name"])
 	}
 
 	var data map[string]any
@@ -227,7 +247,7 @@ func parseMap(f reflect.Value, value any, metadata map[string]string) (reflect.V
 			pair := strings.SplitN(item, ":", 2)
 
 			if len(pair) != 2 {
-				return reflect.Value{}, fmt.Errorf("error while value parsing: invalid map value from environment for '%s' field", metadata["name"])
+				return fmt.Errorf("error while value parsing: invalid map value from environment for '%s' field", metadata["name"])
 			}
 
 			result[pair[0]] = pair[1]
@@ -235,7 +255,7 @@ func parseMap(f reflect.Value, value any, metadata map[string]string) (reflect.V
 
 		data = result
 	} else {
-		return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for the '%s' field must be '%v'", metadata["name"], f.Type())
+		return fmt.Errorf("error while value parsing: invalid value. the value for the '%s' field must be '%v'", metadata["name"], f.Type())
 	}
 
 	newMap := reflect.MakeMap(f.Type())
@@ -243,24 +263,21 @@ func parseMap(f reflect.Value, value any, metadata map[string]string) (reflect.V
 	for k, v := range data {
 		newValue := reflect.New(f.Type().Elem()).Elem()
 
-		val, err := parseValue(newValue, v, metadata)
-		if err != nil {
-			return reflect.Value{}, err
+		if err := parseValue(newValue, v, metadata); err != nil {
+			return err
 		}
-
-		newValue.Set(val)
 
 		newKey := reflect.ValueOf(k)
 
 		newMap.SetMapIndex(newKey, newValue)
 	}
 
-	return newMap, nil
+	f.Set(newMap)
+
+	return nil
 }
 
-func parseArray(f reflect.Value, value any, metadata map[string]string) (reflect.Value, error) {
-	newArray := reflect.New(f.Type())
-
+func parseArray(f reflect.Value, value any, metadata map[string]string) error {
 	var array []any
 
 	if arrayValue, ok := value.([]any); ok {
@@ -275,32 +292,27 @@ func parseArray(f reflect.Value, value any, metadata map[string]string) (reflect
 
 		array = result
 	} else {
-		return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for the '%s' field must be '%v'", metadata["name"], f.Type())
+		return fmt.Errorf("error while value parsing: invalid value. the value for the '%s' field must be '%v'", metadata["name"], f.Type())
 	}
 
 	if len(array) > f.Type().Len() {
-		return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the array value for the '%s' field is longer then %d", metadata["name"], f.Type().Len())
+		return fmt.Errorf("error while value parsing: invalid value. the array value for the '%s' field is longer then %d", metadata["name"], f.Type().Len())
 	}
 
 	for i := range array {
 		newValue := reflect.New(f.Type().Elem()).Elem()
 
-		val, err := parseValue(newValue, array[i], metadata)
-		if err != nil {
-			return reflect.Value{}, err
+		if err := parseValue(newValue, array[i], metadata); err != nil {
+			return err
 		}
 
-		newValue.Set(val)
-
-		newArray.Index(i).Set(newValue)
+		f.Index(i).Set(newValue)
 	}
 
-	return newArray, nil
+	return nil
 }
 
-func parseSlice(f reflect.Value, value any, metadata map[string]string) (reflect.Value, error) {
-	newSlice := reflect.New(f.Type())
-
+func parseSlice(f reflect.Value, value any, metadata map[string]string) error {
 	var slice []any
 
 	if sliceValue, ok := value.([]any); ok {
@@ -315,21 +327,18 @@ func parseSlice(f reflect.Value, value any, metadata map[string]string) (reflect
 
 		slice = result
 	} else {
-		return reflect.Value{}, fmt.Errorf("error while value parsing: invalid value. the value for the '%s' field must be '%v'", metadata["name"], f.Type())
+		return fmt.Errorf("error while value parsing: invalid value. the value for the '%s' field must be '%v'", metadata["name"], f.Type())
 	}
 
 	for i := range slice {
 		newValue := reflect.New(f.Type().Elem()).Elem()
 
-		val, err := parseValue(newValue, slice[i], metadata)
-		if err != nil {
-			return reflect.Value{}, err
+		if err := parseValue(newValue, slice[i], metadata); err != nil {
+			return err
 		}
 
-		newValue.Set(val)
-
-		newSlice.Set(reflect.Append(newValue, newValue))
+		f.Set(reflect.Append(f, newValue))
 	}
 
-	return newSlice, nil
+	return nil
 }

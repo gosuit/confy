@@ -20,7 +20,7 @@ func getStructData(data map[string]any, metadata map[string]string) (map[string]
 	}
 }
 
-func getFieldValue(f reflect.Value, data map[string]any, metadata map[string]string) (reflect.Value, error) {
+func setFieldValue(f reflect.Value, data map[string]any, metadata map[string]string) error {
 	value, fileOk, expanded := getFieldFileValue(data, metadata)
 
 	value, envOk := overrideValueWithEnv(value, metadata)
@@ -37,11 +37,13 @@ func getFieldValue(f reflect.Value, data map[string]any, metadata map[string]str
 		value, defaultOk = getFieldDefaultValue(metadata)
 		if !defaultOk {
 			if isValueRequired(metadata) {
-				return reflect.Value{}, fmt.Errorf("error while value parsing: value for '%s' field is required", metadata["name"])
+				return fmt.Errorf("error while value parsing: value for '%s' field is required", metadata["name"])
 			} else {
-				result := reflect.New(f.Type().Elem()).Elem()
+				newValue := reflect.New(f.Type()).Elem()
 
-				return result, nil
+				f.Set(newValue)
+
+				return nil
 			}
 		}
 	}

@@ -94,18 +94,7 @@ func processField(f reflect.Value, data map[string]any, metadata map[string]stri
 		return processStruct(f, structData, metadata)
 	}
 
-	value, err := getFieldValue(f, data, metadata)
-	if err != nil {
-		return err
-	}
-
-	if value.Type() != f.Type() {
-		return fmt.Errorf("internal error: type of the value from the getFieldValue function differs from the type of the '%s' field", metadata["name"])
-	}
-
-	f.Set(value)
-
-	return nil
+	return setFieldValue(f, data, metadata)
 }
 
 func getFieldMetadata(fieldStructType reflect.StructField, commonMetadata map[string]string) map[string]string {
