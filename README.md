@@ -1,6 +1,6 @@
 # Confy
 
-Confy is Go library for reading configuration settings from environment variables and YAML or other files. It is based on <a href="https://github.com/ilyakaznacheev/cleanenv">CleanEnv</a>. It provides a simple way to manage application configurations while ensuring that the configurations are valid.
+Confy is a Go library designed to make working with the configuration of your application as flexible as possible, but at the same time as simple as possible.
 
 ## Installation
 
@@ -14,11 +14,11 @@ go get github.com/gosuit/confy
   - **YAML**
   - **JSON**
   - **TOML**
+  - **DOTENV**
 - **Environment Variables**: Override configuration settings with environment variables.
 - **Env Names Expand**: Set the names of environment variables through files to get the values
 - **Multiple files**: Load configuration settings from multiple files.
 - **Reader**: High-level interface for flexible management of reading sources
-- **Validation**: Validate configuration structures.
 
 ## Documentation
 
@@ -29,11 +29,14 @@ go get github.com/gosuit/confy
 - [Multiple files read](docs/multiple-files)
 - [Directory read](docs/directory)
 - [Reader](docs/reader)
-- [Validation](docs/validation)
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a pull request or open an issue for any enhancements or bug fixes.
+
+## Thanks
+
+We would like to thank [Ilya Kaznacheev](https://github.com/ilyakaznacheev) for his [Clean Env](https://github.com/ilyakaznacheev/cleanenv) library. Confy did not use the CleanEnv source code, but the idea of Confy was born on the basis of the CleanEnv project and has a similar API. In fact, we wanted to create our own CleanEnv with useful additional functionality.
 
 ## License
 

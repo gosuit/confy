@@ -30,6 +30,8 @@ type Config struct {
 	// 	   2) map
 	//     3) array and slice
 	//     4) interface
+	//     5) time.Time, time.Location, time.Duration
+	//     6) url.URL
 	//
 	Logger Logger `confy:"log"`
 }
