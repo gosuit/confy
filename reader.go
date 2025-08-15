@@ -7,6 +7,11 @@ import (
 	"slices"
 )
 
+const (
+	defaultRootPath   = "config"
+	defaultEnvVarName = "ENVIRONMENT"
+)
+
 type Reader interface {
 	SetRootPath(path string) Reader
 	SetEnvVariableName(name string) Reader
@@ -24,8 +29,8 @@ type reader struct {
 
 func NewReader() Reader {
 	return &reader{
-		rootPath:   "config",
-		envVarName: "ENVIRONMENT",
+		rootPath:   defaultRootPath,
+		envVarName: defaultEnvVarName,
 		readAll:    true,
 		sources:    make([]string, 0),
 	}
@@ -65,7 +70,7 @@ func (r *reader) Read(to any) error {
 		env = "local"
 	}
 
-	paths, err := getAllPathsFromDir(r.rootPath)
+	paths, err := getAllPaths(r.rootPath)
 	if err != nil {
 		return err
 	}
@@ -83,9 +88,9 @@ func (r *reader) Read(to any) error {
 		slices.Contains(paths, tomlSource)
 
 	if dirSourceExists && fileSourceExists {
-		panic("you can't use directory source and file source at the same time")
+		panic("confy: you can't use directory source and file source at the same time")
 	} else if !dirSourceExists && !fileSourceExists {
-		panic("not a single source was found")
+		panic("confy: not a single source was found")
 	} else if fileSourceExists {
 		filePath := ""
 		fileFound := false
@@ -97,7 +102,7 @@ func (r *reader) Read(to any) error {
 
 		if slices.Contains(paths, ymlSource) {
 			if fileFound {
-				panic("there can only be one file source")
+				panic("confy: there can only be one file source")
 			}
 
 			fileFound = true
@@ -106,7 +111,7 @@ func (r *reader) Read(to any) error {
 
 		if slices.Contains(paths, jsonSource) {
 			if fileFound {
-				panic("there can only be one file source")
+				panic("confy: there can only be one file source")
 			}
 
 			fileFound = true
@@ -115,7 +120,7 @@ func (r *reader) Read(to any) error {
 
 		if slices.Contains(paths, tomlSource) {
 			if fileFound {
-				panic("there can only be one file source")
+				panic("confy: there can only be one file source")
 			}
 
 			filePath = tomlSource
@@ -133,7 +138,7 @@ func (r *reader) Read(to any) error {
 				path := filepath.Join(dirSource, toRead[i])
 
 				if !slices.Contains(paths, path) {
-					panic(fmt.Sprintf("source %s wasn`t found", path))
+					panic(fmt.Sprintf("confy: source %s wasn`t found", path))
 				}
 
 				toRead[i] = path
