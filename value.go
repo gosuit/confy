@@ -45,7 +45,11 @@ func setFieldValue(f reflect.Value, data map[string]any, metadata map[string]str
 
 				return nil
 			}
+		} else {
+			metadata["isValueDefault"] = "true"
 		}
+	} else {
+		metadata["isValueDefault"] = "false"
 	}
 
 	return parseValue(f, value, metadata)
