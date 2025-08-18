@@ -141,7 +141,7 @@ func parseString(f reflect.Value, value any, metadata map[string]string) error {
 func parseBool(f reflect.Value, value any, metadata map[string]string) error {
 	if boolValue, ok := value.(bool); ok {
 		f.SetBool(boolValue)
-	} else if stringValue, ok := value.(string); ok && metadata["isValueEnv"] == "true" {
+	} else if stringValue, ok := value.(string); ok && (metadata["isValueEnv"] == "true" || metadata["isValueDefault"] == "true") {
 		boolValue, err := strconv.ParseBool(stringValue)
 		if err != nil {
 			return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be bool", metadata["name"])
@@ -162,7 +162,7 @@ func parseInt(f reflect.Value, value any, metadata map[string]string) error {
 		} else {
 			return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field is overflowed", metadata["name"])
 		}
-	} else if stringValue, ok := value.(string); ok && metadata["isValueEnv"] == "true" {
+	} else if stringValue, ok := value.(string); ok && (metadata["isValueEnv"] == "true" || metadata["isValueDefault"] == "true") {
 		intValue, err := strconv.ParseInt(stringValue, 10, 64)
 		if err != nil {
 			return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be int", metadata["name"])
@@ -187,7 +187,7 @@ func parseUint(f reflect.Value, value any, metadata map[string]string) error {
 		} else {
 			return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field is overflowed", metadata["name"])
 		}
-	} else if stringValue, ok := value.(string); ok && metadata["isValueEnv"] == "true" {
+	} else if stringValue, ok := value.(string); ok && (metadata["isValueEnv"] == "true" || metadata["isValueDefault"] == "true") {
 		uintValue, err := strconv.ParseUint(stringValue, 10, 64)
 		if err != nil {
 			return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be uint", metadata["name"])
@@ -212,7 +212,7 @@ func parseFloat(f reflect.Value, value any, metadata map[string]string) error {
 		} else {
 			return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field is overflowed", metadata["name"])
 		}
-	} else if stringValue, ok := value.(string); ok && metadata["isValueEnv"] == "true" {
+	} else if stringValue, ok := value.(string); ok && (metadata["isValueEnv"] == "true" || metadata["isValueDefault"] == "true") {
 		floatValue, err := strconv.ParseFloat(stringValue, 64)
 		if err != nil {
 			return fmt.Errorf("error while value parsing: invalid value. the value for '%s' field must be float", metadata["name"])
@@ -239,7 +239,7 @@ func parseMap(f reflect.Value, value any, metadata map[string]string) error {
 
 	if mapValue, ok := value.(map[string]any); ok {
 		data = mapValue
-	} else if stringValue, ok := value.(string); ok && metadata["isValueEnv"] == "true" {
+	} else if stringValue, ok := value.(string); ok && (metadata["isValueEnv"] == "true" || metadata["isValueDefault"] == "true") {
 		items := strings.Split(stringValue, metadata["separator"])
 		result := make(map[string]any)
 
@@ -282,7 +282,7 @@ func parseArray(f reflect.Value, value any, metadata map[string]string) error {
 
 	if arrayValue, ok := value.([]any); ok {
 		array = arrayValue
-	} else if stringValue, ok := value.(string); ok && metadata["isValueEnv"] == "true" {
+	} else if stringValue, ok := value.(string); ok && (metadata["isValueEnv"] == "true" || metadata["isValueDefault"] == "true") {
 		stringArray := strings.Split(stringValue, metadata["separator"])
 		var result []any
 
@@ -317,7 +317,7 @@ func parseSlice(f reflect.Value, value any, metadata map[string]string) error {
 
 	if sliceValue, ok := value.([]any); ok {
 		slice = sliceValue
-	} else if stringValue, ok := value.(string); ok && metadata["isValueEnv"] == "true" {
+	} else if stringValue, ok := value.(string); ok && (metadata["isValueEnv"] == "true" || metadata["isValueDefault"] == "true") {
 		stringArray := strings.Split(stringValue, metadata["separator"])
 		var result []any
 
