@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 )
 
@@ -85,7 +86,7 @@ func processField(f reflect.Value, data map[string]any, metadata map[string]stri
 		return nil
 	}
 
-	if f.Kind() == reflect.Struct {
+	if f.Kind() == reflect.Struct && !slices.Contains(specificTypes, f.Type()) {
 		structData, err := getStructData(data, metadata)
 		if err != nil {
 			return err

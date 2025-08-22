@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+var (
+	specificTypes = []reflect.Type{reflect.TypeOf(time.Time{}), reflect.TypeOf(url.URL{}), reflect.TypeOf(time.Location{}), reflect.TypeOf(time.Duration(0))}
+)
+
 func parseValue(f reflect.Value, value any, metadata map[string]string) error {
 
 	switch f.Type() {
