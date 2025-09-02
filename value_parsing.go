@@ -10,23 +10,23 @@ import (
 )
 
 var (
-	specificTypes = []reflect.Type{reflect.TypeOf(time.Time{}), reflect.TypeOf(url.URL{}), reflect.TypeOf(time.Location{}), reflect.TypeOf(time.Duration(0))}
+	specificTypes = []reflect.Type{reflect.TypeFor[time.Time](), reflect.TypeFor[url.URL](), reflect.TypeFor[time.Location](), reflect.TypeFor[time.Duration]()}
 )
 
 func parseValue(f reflect.Value, value any, metadata map[string]string) error {
 
 	switch f.Type() {
 
-	case reflect.TypeOf(time.Time{}):
+	case reflect.TypeFor[time.Time]():
 		return parseTime(f, value, metadata)
 
-	case reflect.TypeOf(url.URL{}):
+	case reflect.TypeFor[url.URL]():
 		return parseUrl(f, value, metadata)
 
-	case reflect.TypeOf(time.Location{}):
+	case reflect.TypeFor[time.Location]():
 		return parseTimeLocation(f, value, metadata)
 
-	case reflect.TypeOf(time.Duration(0)):
+	case reflect.TypeFor[time.Duration]():
 		return parseTimeDuration(f, value, metadata)
 	}
 
