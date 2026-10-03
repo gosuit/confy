@@ -1,4 +1,4 @@
-module gitlab.coffee-proj.com/gosuit/confy
+module github.com/gosuit/confy
 
 go 1.27.1
 
